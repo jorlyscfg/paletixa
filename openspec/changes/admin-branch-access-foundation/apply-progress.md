@@ -5,9 +5,9 @@
 - Mode: Standard (`strict_tdd: false`)
 - Delivery strategy: `auto-chain`
 - Chain strategy: `stacked-to-main`
-- Current work unit: PR 4 — configuration complete; final verification/remediation pending
+- Current work unit: PR 4 — complete
 - Future target: `main`
-- Runtime attempt token: `sha256:1c864de674e762133081d08dbd053160cde01b6a168f9e9565b8528094ba9279`
+- Runtime attempt token: `sha256:9d8bb0196ccd88b780b4ed9d0cfa04dcaa58e8b01f8e2ad53b3b4e770c8737d5`
 - Auditable baseline commit: `6e7db8bc0354cacf9bb249bdfd9e3503fd00746e`; the PR 1 commit is its direct child, with the exact child hash persisted in Engram and the Result Contract because a commit cannot contain its own hash.
 
 ## Cumulative Task Status
@@ -26,7 +26,7 @@
 - [x] 3.3 Add the branch workspace.
 - [x] 3.4 Wire application providers and protected states.
 - [x] 4.1 Document explicit audited confirmation for fictitious development accounts while verification remains enabled.
-- [ ] 4.2 Complete safe fresh verification and bind prior irreversible-contract evidence.
+- [x] 4.2 Complete safe fresh verification and bind prior irreversible-contract evidence.
 
 ## Work Unit Evidence
 
@@ -93,3 +93,15 @@
 - The maintainer replaced unsupported auto-verification with explicit, auditable confirmation restricted to fictitious development accounts. Development and production verification remain enabled.
 - No destructive integration, fixture deletion, reset, branch deletion, backend merge, commit, or push ran. CLI context returned to parent `paletixa`; production remains 0 foundation tables/functions/policies.
 - Git merge and backend merge are separate approval gates. Any real backend merge requires a later explicit approval naming the branch and reviewed clean dry-run.
+
+## Task 4.2 Remediation Evidence
+
+| Evidence | Exact result |
+|---|---|
+| Focused source checks | `bun run test` passed 3 files/16 tests; lint and build passed with 107 modules. |
+| Runtime harness | Repeatable mode passed 1 targeted test (11 historical cases skipped) in 29.85s. A unique capable user created a branch; RPC output and direct SELECT proved `id`, normalized `name`, and initial `active` status. |
+| Cleanup | Teardown plus independent readback proved 0 temporary users, profiles, role grants, command receipts, and branches. Fixed historical fixtures and bootstrap receipts were untouched. |
+| Production safety | Parent readback remained 0 foundation tables/functions/policies; final CLI project was `paletixa`. No production SQL/RPC/write ran. |
+| Rollback boundary | Revert only the repeatable harness mode and this task/progress/report update; no backend rollback is needed. |
+
+Canonical verification revision: `sha256:c1af11ef8b7fec9750c20140d41e2e50f8d301a16f1cdfe9383b02d9f9835c86`.
