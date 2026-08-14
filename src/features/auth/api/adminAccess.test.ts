@@ -32,6 +32,6 @@ describe('server-authoritative admin access', () => {
     sdk.database.from.mockReturnValue(query); query.select.mockReturnValue(query)
     query.order.mockResolvedValue({ data: rows, error: null })
     await expect(listBranches()).resolves.toHaveLength(201)
-    expect(query.limit).not.toHaveBeenCalled()
+    expect(sdk.database.from).toHaveBeenCalledWith('branches'); expect(query.limit).not.toHaveBeenCalled()
   })
 })

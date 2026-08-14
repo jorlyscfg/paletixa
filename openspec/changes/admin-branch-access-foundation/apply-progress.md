@@ -71,6 +71,6 @@
 ## PR 3 Work Unit Evidence
 
 - Focused: `bun run test` passed 3 files/16 tests; lint/build passed (107 modules); HTTP harness returned 200/620 bytes and stopped; Impeccable returned `[]`; diff-check passed. Integration was skipped because it mutates backend fixtures/DDL.
-- Correction: stale reads remain suppressible, while guarded serialized mutations always reconcile confirmed results; the overlap test proves refresh/create/status disabled and the result visible. API coverage returns 201 rows without calling `limit`.
+- Correction: stale reads remain suppressible, while guarded serialized mutations always reconcile confirmed results; the overlap test proves refresh/create/status disabled and the result visible. API coverage binds `from('branches')`, returns 201 rows, and never calls `limit`.
 - Rollback: revert only `branches.ts`, `BranchWorkspace.tsx`, their focused tests, and this evidence line; auth, backend, tasks 4.x, and prior PR 3 behavior remain untouched.
-- Review `review-034dc41bca78498a` generation 1 fixed R3-001/R4-001/R4-002 within 400 authored lines. Runtime token `sha256:ecf4506f4afb3027e243b13b1c3408b09d41350916d7d03164b9bfdd5375f34a` is ready to settle.
+- Review `review-034dc41bca78498a` generation 10 recovery preserved R3-001/R4-001/R4-002 within 400 authored lines. Runtime token `sha256:69fe6d1328f3a1baeb95b7e328e55b70ac86c18c763e01c510f81472b9af62fb` settled passed with evidence `sha256:847fe49418c09524ccd7f2a963fa41e6c5573b8e2254e13916b8ce6fc683598e`.
