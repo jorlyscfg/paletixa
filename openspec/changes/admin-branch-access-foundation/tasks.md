@@ -30,17 +30,17 @@ PR integration order: PR 1 → main; PR 2 after PR 1 → main; PR 3 after PR 2 �
 ## Phase 1: Test and Backend Foundation
 
 - [x] 1.1 Update `package.json`, `bun.lock`, `vitest.config.ts`, and `src/test/setup.ts`; install Vitest/jsdom/Testing Library, add `test` and `test:integration`, and prove each command executes.
-- [ ] 1.2 Create schema-only InsForge branch `admin-branch-access-foundation`; inspect migrations/policies/functions, apply only there, restart the dev server with branch anon settings, and record merge dry-run.
-- [ ] 1.3 Create `tests/integration/auth-rls.contract.test.ts` RED cases: anon/expired/unverified/inactive/missing-capability deny context, RLS, and every RPC without data.
-- [ ] 1.4 Add `migrations/*_admin-branch-access-foundation.sql`: profiles, roles/capabilities, immutable receipts, seeds, grants, non-recursive pinned-path `has_capability`, `get_admin_context`, and branch SELECT RLS.
-- [ ] 1.5 Make 1.3 GREEN: deny direct authorization DML and branch writes; return generic denied access for invalid, inactive, or incapable sessions.
+- [x] 1.2 Create schema-only InsForge branch `admin-branch-access-foundation`; inspect migrations/policies/functions, apply only there, restart the dev server with branch anon settings, and record merge dry-run.
+- [x] 1.3 Create `tests/integration/auth-rls.contract.test.ts` RED cases: anon/expired/unverified/inactive/missing-capability deny context, RLS, and every RPC without data.
+- [x] 1.4 Add `migrations/*_admin-branch-access-foundation.sql`: profiles, roles/capabilities, immutable receipts, seeds, grants, non-recursive pinned-path `has_capability`, `get_admin_context`, and branch SELECT RLS.
+- [x] 1.5 Make 1.3 GREEN: deny direct authorization DML and branch writes; return generic denied access for invalid, inactive, or incapable sessions.
 
 ## Phase 2: Privileged Commands and Receipts
 
-- [ ] 2.1 Add RED integration cases for unverified/inactive bootstrap rejection, atomic rollback, same-user replay, cross-user conflict, and irreversible consumed bootstrap marker.
-- [ ] 2.2 Add privileged `bootstrap_first_admin`, separate `revoke_admin_access`, and separate `reassign_admin_access`; revoke never deletes/reopens bootstrap receipt and none is browser-executable.
-- [ ] 2.3 Add RED cases for create/status matching retry replay, divergent request-id conflict, concurrent create uniqueness, valid transitions, same-state success, and suspended-operation rejection.
-- [ ] 2.4 Add `create_branch`/`set_branch_status` SECURITY DEFINER RPCs with canonical hashes, locked immutable receipts, validation, atomic mutation, and capability checks; make 2.3 GREEN.
+- [x] 2.1 Add RED integration cases for unverified/inactive bootstrap rejection, atomic rollback, same-user replay, cross-user conflict, and irreversible consumed bootstrap marker.
+- [x] 2.2 Add privileged `bootstrap_first_admin`, separate `revoke_admin_access`, and separate `reassign_admin_access`; revoke never deletes/reopens bootstrap receipt and none is browser-executable.
+- [x] 2.3 Add RED cases for create/status matching retry replay, divergent request-id conflict, concurrent create uniqueness, valid transitions, same-state success, and suspended-operation rejection.
+- [x] 2.4 Add `create_branch`/`set_branch_status` SECURITY DEFINER RPCs with canonical hashes, locked immutable receipts, validation, atomic mutation, and capability checks; make 2.3 GREEN.
 
 ## Phase 3: Browser Features
 

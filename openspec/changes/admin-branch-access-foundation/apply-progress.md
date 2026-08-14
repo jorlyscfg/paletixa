@@ -5,22 +5,22 @@
 - Mode: Standard (`strict_tdd: false`)
 - Delivery strategy: `auto-chain`
 - Chain strategy: `stacked-to-main`
-- Current work unit: PR 1 — `pr1-test-tooling-client-config`
+- Current work unit: PR 2 — `pr2-authorization-migration-privileged-ops` (focused remediation complete)
 - Future target: `main`
-- Runtime attempt token: `sha256:fca6252d2859da4b486a3cd998a58918658b4627851c6523f8c2fbd6e234e56f`
+- Runtime attempt token: `sha256:57ab18bcb8f9df551e83d01fa3bb3b9b9bd96cb5750daf70bdfc9582d980a3e3`
 - Auditable baseline commit: `6e7db8bc0354cacf9bb249bdfd9e3503fd00746e`; the PR 1 commit is its direct child, with the exact child hash persisted in Engram and the Result Contract because a commit cannot contain its own hash.
 
 ## Cumulative Task Status
 
 - [x] 1.1 Install and verify Vitest, jsdom, Testing Library, and executable unit/integration scripts.
-- [ ] 1.2 Create and inspect the schema-only InsForge branch.
-- [ ] 1.3 Add RED authorization integration contracts.
-- [ ] 1.4 Add the authorization and branch schema migration.
-- [ ] 1.5 Make direct authorization and branch access denials GREEN.
-- [ ] 2.1 Add bootstrap rejection, replay, conflict, and rollback contracts.
-- [ ] 2.2 Add privileged bootstrap, revoke, and reassignment operations.
-- [ ] 2.3 Add branch command idempotency and concurrency contracts.
-- [ ] 2.4 Add transactional branch command RPCs.
+- [x] 1.2 Create and inspect the schema-only InsForge branch.
+- [x] 1.3 Add RED authorization integration contracts.
+- [x] 1.4 Add the authorization and branch schema migration.
+- [x] 1.5 Make direct authorization and branch access denials GREEN.
+- [x] 2.1 Add bootstrap rejection, replay, conflict, and rollback contracts.
+- [x] 2.2 Add privileged bootstrap, revoke, and reassignment operations.
+- [x] 2.3 Add branch command idempotency and concurrency contracts.
+- [x] 2.4 Add transactional branch command RPCs.
 - [x] 3.1 Add typed URL/anon-key-only browser configuration and privileged-key rejection tests.
 - [ ] 3.2 Add the authentication boundary.
 - [ ] 3.3 Add the branch workspace.
@@ -46,8 +46,21 @@
 - Persistence breakdown: `tasks.md` 4 and `apply-progress.md` 53 (57 lines).
 - Budget result: within the 400-line work-unit limit.
 
+## PR 2 Work Unit Evidence
+
+| Evidence | Exact result |
+|---|---|
+| RED contract | On fresh schema-only branch `admin-branch-access-foundation-validation` at T0, `bun run test:integration` exited 1: PR1 smoke passed and all 11 expanded PR2 cases skipped because `public.profiles` did not exist. |
+| Focused test | After migration `20260814025511`, `bun run test:integration` exited 0: 2 files and 12 tests passed in 67.06s — 8 PR2 contract declarations (11 expanded runtime cases) plus 1 PR1 smoke contract. |
+| Branch runtime | Fresh schema-only validation branch received the migration from T0. Readback found 8 tables, 1 branch SELECT policy, 8 pinned-path functions, 1 bootstrap receipt, 5 command receipts, 2 branches, and 1 admin grant. |
+| Verification field | Real `auth.users` contains `email_verified boolean` and no `email_confirmed_at`. The server-side predicate and privileged target checks use the trusted verification value (with a compatibility probe for `email_confirmed_at`) and the unverified contract passed. |
+| Quality | `bun run lint` exited 0. `bun run build` exited 0; Vite built 16 modules in 354ms. |
+| Merge safety | Validation-branch dry-run reported 18 additions, 0 modifications, 0 conflicts, and `applied:false`; no merge or production mutation occurred. CLI context was restored to parent `paletixa`. |
+| Review budget | PR 2 totals 383 authored changed lines against `origin/main`: 177 migration, 153 contracts, and 53 OpenSpec additions/deletions. |
+| Rollback boundary | Remove the migration and PR2 contract file; revert tasks 1.2–1.5/2.1–2.4 plus this PR2 section in `tasks.md` and `apply-progress.md`. Leave the unmerged validation branch untouched pending separately approved deletion. |
+
 ## Deviations and Issues
 
-- Deviations from design: None.
+- Deviations from design: InsForge 2.3.1 exposes `auth.users.email_verified`, not `email_confirmed_at`; the predicate checks `email_confirmed_at` when present and uses the platform's trusted `email_verified` field otherwise.
 - Issues: Bun was available at `$HOME/.bun/bin/bun` rather than on the default PATH; all evidence commands explicitly added that directory to PATH. The baseline lockfile was regenerated from the documented pre-PR package before restoring PR 1.
-- Backend mutation: None.
+- Backend mutation: migration and synthetic contract data exist only on schema-only branch `admin-branch-access-foundation-validation`; production remains unchanged and the prior branch was not reset.
