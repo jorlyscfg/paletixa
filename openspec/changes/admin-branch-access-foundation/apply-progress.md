@@ -5,9 +5,9 @@
 - Mode: Standard (`strict_tdd: false`)
 - Delivery strategy: `auto-chain`
 - Chain strategy: `stacked-to-main`
-- Current work unit: PR 2 — `pr2-authorization-migration-privileged-ops` (focused remediation complete)
+- Current work unit: PR 3 — `pr3-authentication-branch-workspace` (bounded correction complete)
 - Future target: `main`
-- Runtime attempt token: `sha256:57ab18bcb8f9df551e83d01fa3bb3b9b9bd96cb5750daf70bdfc9582d980a3e3`
+- Runtime attempt token: `sha256:8afb1752134297fe40bc56c9e1f9f1a4295b145a2a39b65d6a4a3ace971a8719`
 - Auditable baseline commit: `6e7db8bc0354cacf9bb249bdfd9e3503fd00746e`; the PR 1 commit is its direct child, with the exact child hash persisted in Engram and the Result Contract because a commit cannot contain its own hash.
 
 ## Cumulative Task Status
@@ -22,9 +22,9 @@
 - [x] 2.3 Add branch command idempotency and concurrency contracts.
 - [x] 2.4 Add transactional branch command RPCs.
 - [x] 3.1 Add typed URL/anon-key-only browser configuration and privileged-key rejection tests.
-- [ ] 3.2 Add the authentication boundary.
-- [ ] 3.3 Add the branch workspace.
-- [ ] 3.4 Wire application providers and protected states.
+- [x] 3.2 Add the authentication boundary.
+- [x] 3.3 Add the branch workspace.
+- [x] 3.4 Wire application providers and protected states.
 - [ ] 4.1 Document development email verification behavior.
 - [ ] 4.2 Complete backend and rollout verification.
 
@@ -67,3 +67,20 @@
 
 ## Review Correction
 - Generation 6 for `review-d7347b0943c7efcf` fixed R1-001/R3-001: parent guard failed before SQL; validation branch integration passed 12/12 in 83.31s; lint/build passed; readback was 8 tables/1 policy/8 pinned functions/1 bootstrap receipt/5 command receipts/2 branches/1 admin grant; dry-run was 18 additions/0 modifications/0 conflicts; parent readback remained 0/0/0 and context returned to `paletixa`. Candidate: 400 lines; correction: 31 lines. Rollback only this section plus focused migration/test edits.
+
+## PR 3 Work Unit Evidence
+
+| Evidence | Exact result |
+|---|---|
+| Correction behavior | Added list-pending/create-visible and stale AdminBoundary access-response tests; no historical RED result is claimed for this correction. |
+| Focused test | Exact `bun run test` script executed `vitest run src --exclude 'tests/integration/**'` and exited 0: 3 source files and 14 tests passed. |
+| Integration safety | `bun run test:integration` was not run: `auth-rls.contract.test.ts` performs fixture writes, bootstrap consumption, branch commands, and DDL, so it is not read-only. |
+| Runtime harness | Vite served HTTP 200 at `127.0.0.1:41733` (620 bytes) and stopped; read-only InsForge `current` confirmed CLI parent `paletixa`. No backend command or fixture mutation ran. |
+| Quality | `bun run lint` exited 0; `bun run build` exited 0 with 107 modules transformed in 408ms; Impeccable detector returned `[]`; `git diff --check` passed. |
+| Retry and freshness | The latest list/create/status sequence alone commits UI state; successful create closes loading, remains visible after the stale list resolves, and stale AdminBoundary access responses stay suppressed. |
+| Rollback boundary | Revert `src/App.tsx`; remove `src/app/AppProviders.tsx` and `src/features/{auth,branches}/`. Revert only tasks 3.2–3.4 and this PR 3 section; backend migration, validation branch, and tasks 4.x remain untouched. |
+
+## PR 3 Review Budget
+
+- Review budget: 397 authored changed lines against `origin/main`, including OpenSpec persistence and excluding pre-existing untracked `.codegraph/`; below the 400-line limit.
+- Work unit boundary is PR 2 merged to `main` → PR 3 browser features targeting `main`; PR 4 remains out of scope.
