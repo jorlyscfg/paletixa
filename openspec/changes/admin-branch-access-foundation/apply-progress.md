@@ -5,7 +5,7 @@
 - Mode: Standard (`strict_tdd: false`)
 - Delivery strategy: `auto-chain`
 - Chain strategy: `stacked-to-main`
-- Current work unit: PR 3 — `pr3-authentication-branch-workspace` (bounded correction complete)
+- Current work unit: PR 3 — `pr3-authentication-branch-workspace` (review correction complete)
 - Future target: `main`
 - Runtime attempt token: `sha256:8afb1752134297fe40bc56c9e1f9f1a4295b145a2a39b65d6a4a3ace971a8719`
 - Auditable baseline commit: `6e7db8bc0354cacf9bb249bdfd9e3503fd00746e`; the PR 1 commit is its direct child, with the exact child hash persisted in Engram and the Result Contract because a commit cannot contain its own hash.
@@ -70,17 +70,7 @@
 
 ## PR 3 Work Unit Evidence
 
-| Evidence | Exact result |
-|---|---|
-| Correction behavior | Added list-pending/create-visible and stale AdminBoundary access-response tests; no historical RED result is claimed for this correction. |
-| Focused test | Exact `bun run test` script executed `vitest run src --exclude 'tests/integration/**'` and exited 0: 3 source files and 14 tests passed. |
-| Integration safety | `bun run test:integration` was not run: `auth-rls.contract.test.ts` performs fixture writes, bootstrap consumption, branch commands, and DDL, so it is not read-only. |
-| Runtime harness | Vite served HTTP 200 at `127.0.0.1:41733` (620 bytes) and stopped; read-only InsForge `current` confirmed CLI parent `paletixa`. No backend command or fixture mutation ran. |
-| Quality | `bun run lint` exited 0; `bun run build` exited 0 with 107 modules transformed in 408ms; Impeccable detector returned `[]`; `git diff --check` passed. |
-| Retry and freshness | The latest list/create/status sequence alone commits UI state; successful create closes loading, remains visible after the stale list resolves, and stale AdminBoundary access responses stay suppressed. |
-| Rollback boundary | Revert `src/App.tsx`; remove `src/app/AppProviders.tsx` and `src/features/{auth,branches}/`. Revert only tasks 3.2–3.4 and this PR 3 section; backend migration, validation branch, and tasks 4.x remain untouched. |
-
-## PR 3 Review Budget
-
-- Review budget: 397 authored changed lines against `origin/main`, including OpenSpec persistence and excluding pre-existing untracked `.codegraph/`; below the 400-line limit.
-- Work unit boundary is PR 2 merged to `main` → PR 3 browser features targeting `main`; PR 4 remains out of scope.
+- Focused: `bun run test` passed 3 files/16 tests; lint/build passed (107 modules); HTTP harness returned 200/620 bytes and stopped; Impeccable returned `[]`; diff-check passed. Integration was skipped because it mutates backend fixtures/DDL.
+- Correction: stale reads remain suppressible, while guarded serialized mutations always reconcile confirmed results; the overlap test proves refresh/create/status disabled and the result visible. API coverage returns 201 rows without calling `limit`.
+- Rollback: revert only `branches.ts`, `BranchWorkspace.tsx`, their focused tests, and this evidence line; auth, backend, tasks 4.x, and prior PR 3 behavior remain untouched.
+- Review `review-034dc41bca78498a` generation 1 fixed R3-001/R4-001/R4-002 within 400 authored lines. Runtime token `sha256:ecf4506f4afb3027e243b13b1c3408b09d41350916d7d03164b9bfdd5375f34a` is ready to settle.

@@ -7,14 +7,12 @@ import * as branchApi from '../api/branches'
 
 vi.mock('../../auth/api/adminAccess', () => ({ getAdminAccess: vi.fn(), signIn: vi.fn() }))
 vi.mock('../api/branches', () => ({ listBranches: vi.fn(), createBranch: vi.fn(), setBranchStatus: vi.fn() }))
-
 const branch = { id: 'branch-1', name: 'Central', status: 'active' as const }
 const deferred = <T,>() => {
   let resolve!: (value: T) => void
   const promise = new Promise<T>((done) => { resolve = done })
   return { promise, resolve }
 }
-
 describe('admin branch workspace', () => {
   afterEach(cleanup)
   beforeEach(() => {
@@ -22,15 +20,12 @@ describe('admin branch workspace', () => {
     vi.mocked(authApi.getAdminAccess).mockResolvedValue(true)
     vi.mocked(branchApi.listBranches).mockResolvedValue([])
   })
-
   it('shows one generic denial and never requests protected data', async () => {
     vi.mocked(authApi.getAdminAccess).mockResolvedValue(false)
     render(<App />)
     expect(await screen.findByRole('heading', { name: 'Access unavailable' })).toBeInTheDocument()
-    expect(screen.queryByText('inactive')).not.toBeInTheDocument()
-    expect(branchApi.listBranches).not.toHaveBeenCalled()
+    expect(screen.queryByText('inactive')).not.toBeInTheDocument(); expect(branchApi.listBranches).not.toHaveBeenCalled()
   })
-
   it('focuses an access error and retries the server check', async () => {
     vi.mocked(authApi.getAdminAccess).mockRejectedValueOnce(new Error('offline')).mockResolvedValueOnce(false)
     render(<App />)
@@ -39,7 +34,6 @@ describe('admin branch workspace', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Try again' }))
     expect(await screen.findByRole('heading', { name: 'Access unavailable' })).toBeInTheDocument()
   })
-
   it('moves from accessible loading to the empty workspace', async () => {
     const load = deferred<branchApi.Branch[]>()
     vi.mocked(branchApi.listBranches).mockReturnValue(load.promise)
@@ -48,7 +42,6 @@ describe('admin branch workspace', () => {
     load.resolve([])
     expect(await screen.findByText('No branches yet.')).toBeInTheDocument()
   })
-
   it('shows a successful create while an older list is pending', async () => {
     const load = deferred<branchApi.Branch[]>()
     vi.mocked(branchApi.listBranches).mockReturnValue(load.promise)
@@ -62,7 +55,19 @@ describe('admin branch workspace', () => {
     load.resolve([])
     await waitFor(() => expect(screen.getByText('Central')).toBeInTheDocument())
   })
-
+  it('serializes commands and keeps the confirmed result visible', async () => {
+    const status = deferred<branchApi.Branch>()
+    vi.mocked(branchApi.listBranches).mockResolvedValue([branch])
+    vi.mocked(branchApi.setBranchStatus).mockReturnValue(status.promise)
+    render(<App />)
+    fireEvent.click(await screen.findByRole('button', { name: 'Suspend Central' }))
+    for (const name of ['Refresh branches', 'Create branch', 'Suspend Central'])
+      expect(screen.getByRole('button', { name })).toBeDisabled()
+    fireEvent.submit(screen.getByRole('form', { name: 'Create branch' }))
+    expect(branchApi.createBranch).not.toHaveBeenCalled()
+    status.resolve({ ...branch, status: 'suspended' })
+    expect(await screen.findByText('Suspended')).toBeInTheDocument()
+  })
   it('keeps the newest admin access response', async () => {
     const older = deferred<boolean>()
     const newer = deferred<boolean>()
@@ -75,7 +80,6 @@ describe('admin branch workspace', () => {
     older.resolve(false)
     await waitFor(() => expect(screen.queryByRole('heading', { name: 'Access unavailable' })).not.toBeInTheDocument())
   })
-
   it('recovers from a branch loading error', async () => {
     vi.mocked(branchApi.listBranches)
       .mockRejectedValueOnce(new Error('offline'))
@@ -87,7 +91,6 @@ describe('admin branch workspace', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Try again' }))
     expect(await screen.findByText('No branches yet.')).toBeInTheDocument()
   })
-
   it('retries create with the same request ID', async () => {
     vi.mocked(branchApi.createBranch)
       .mockRejectedValueOnce(new Error('timeout'))
@@ -102,7 +105,6 @@ describe('admin branch workspace', () => {
     const calls = vi.mocked(branchApi.createBranch).mock.calls
     expect(calls[0][1]).toBe(calls[1][1])
   })
-
   it('uses a new request ID for a divergent create intent', async () => {
     vi.mocked(branchApi.createBranch).mockRejectedValue(new Error('conflict'))
     render(<App />)
@@ -115,7 +117,6 @@ describe('admin branch workspace', () => {
     const calls = vi.mocked(branchApi.createBranch).mock.calls
     expect(calls[0][1]).not.toBe(calls[1][1])
   })
-
   it('retries a status change with the same request ID', async () => {
     vi.mocked(branchApi.listBranches).mockResolvedValue([branch])
     vi.mocked(branchApi.setBranchStatus)
@@ -129,7 +130,6 @@ describe('admin branch workspace', () => {
     const calls = vi.mocked(branchApi.setBranchStatus).mock.calls
     expect(calls[0][2]).toBe(calls[1][2])
   })
-
   it('ignores stale branch responses', async () => {
     vi.mocked(branchApi.listBranches).mockResolvedValueOnce([branch])
     render(<App />)

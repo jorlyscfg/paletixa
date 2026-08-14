@@ -10,7 +10,7 @@ function commandResult(data: unknown): Branch {
 
 export async function listBranches(): Promise<Branch[]> {
   const { data, error } = await insforge.database.from('branches')
-    .select('id, name, status').order('name').limit(200)
+    .select('id, name, status').order('name')
   if (error) throw error
   return data as Branch[]
 }
