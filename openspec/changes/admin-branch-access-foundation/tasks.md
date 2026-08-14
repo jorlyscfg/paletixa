@@ -45,9 +45,9 @@ PR integration order: PR 1 → main; PR 2 after PR 1 → main; PR 3 after PR 2 �
 ## Phase 3: Browser Features
 
 - [x] 3.1 Create `.env.example`, `src/env.d.ts`, and `src/lib/insforge.ts` with URL/anon-key only; test that no admin/API key is accepted by browser configuration.
-- [ ] 3.2 Create `src/features/auth/{api,model,ui}/` RED/component tests, then session recovery and accessible generic denied/loading/error states from `get_admin_context`.
-- [ ] 3.3 Create `src/features/branches/{api,ui}/` RED/component tests, then accessible mobile-first list/create/status controls with 44px targets and no protected-data rendering when denied.
-- [ ] 3.4 Wire `src/app/AppProviders.tsx`, `src/App.tsx`, and `src/main.tsx`; verify eligible admin workspace and generic denied session states.
+- [x] 3.2 Create `src/features/auth/{api,model,ui}/` RED/component tests, then session recovery and accessible generic denied/loading/error states from `get_admin_context`.
+- [x] 3.3 Create `src/features/branches/{api,ui}/` RED/component tests, then accessible mobile-first list/create/status controls with 44px targets and no protected-data rendering when denied.
+- [x] 3.4 Wire `src/app/AppProviders.tsx`, `src/App.tsx`, and `src/main.tsx`; verify eligible admin workspace and generic denied session states.
 
 ## Phase 4: Configuration and Verification
 

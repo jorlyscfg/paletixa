@@ -5,9 +5,9 @@
 - Mode: Standard (`strict_tdd: false`)
 - Delivery strategy: `auto-chain`
 - Chain strategy: `stacked-to-main`
-- Current work unit: PR 2 — `pr2-authorization-migration-privileged-ops` (focused remediation complete)
+- Current work unit: PR 3 — `pr3-authentication-branch-workspace` (review correction complete)
 - Future target: `main`
-- Runtime attempt token: `sha256:57ab18bcb8f9df551e83d01fa3bb3b9b9bd96cb5750daf70bdfc9582d980a3e3`
+- Runtime attempt token: `sha256:8afb1752134297fe40bc56c9e1f9f1a4295b145a2a39b65d6a4a3ace971a8719`
 - Auditable baseline commit: `6e7db8bc0354cacf9bb249bdfd9e3503fd00746e`; the PR 1 commit is its direct child, with the exact child hash persisted in Engram and the Result Contract because a commit cannot contain its own hash.
 
 ## Cumulative Task Status
@@ -22,9 +22,9 @@
 - [x] 2.3 Add branch command idempotency and concurrency contracts.
 - [x] 2.4 Add transactional branch command RPCs.
 - [x] 3.1 Add typed URL/anon-key-only browser configuration and privileged-key rejection tests.
-- [ ] 3.2 Add the authentication boundary.
-- [ ] 3.3 Add the branch workspace.
-- [ ] 3.4 Wire application providers and protected states.
+- [x] 3.2 Add the authentication boundary.
+- [x] 3.3 Add the branch workspace.
+- [x] 3.4 Wire application providers and protected states.
 - [ ] 4.1 Document development email verification behavior.
 - [ ] 4.2 Complete backend and rollout verification.
 
@@ -67,3 +67,10 @@
 
 ## Review Correction
 - Generation 6 for `review-d7347b0943c7efcf` fixed R1-001/R3-001: parent guard failed before SQL; validation branch integration passed 12/12 in 83.31s; lint/build passed; readback was 8 tables/1 policy/8 pinned functions/1 bootstrap receipt/5 command receipts/2 branches/1 admin grant; dry-run was 18 additions/0 modifications/0 conflicts; parent readback remained 0/0/0 and context returned to `paletixa`. Candidate: 400 lines; correction: 31 lines. Rollback only this section plus focused migration/test edits.
+
+## PR 3 Work Unit Evidence
+
+- Focused: `bun run test` passed 3 files/16 tests; lint/build passed (107 modules); HTTP harness returned 200/620 bytes and stopped; Impeccable returned `[]`; diff-check passed. Integration was skipped because it mutates backend fixtures/DDL.
+- Correction: stale reads remain suppressible, while guarded serialized mutations always reconcile confirmed results; the overlap test proves refresh/create/status disabled and the result visible. API coverage binds `from('branches')`, returns 201 rows, and never calls `limit`.
+- Rollback: revert only `branches.ts`, `BranchWorkspace.tsx`, their focused tests, and this evidence line; auth, backend, tasks 4.x, and prior PR 3 behavior remain untouched.
+- Review `review-034dc41bca78498a` generation 10 recovery preserved R3-001/R4-001/R4-002 within 400 authored lines. Runtime token `sha256:69fe6d1328f3a1baeb95b7e328e55b70ac86c18c763e01c510f81472b9af62fb` settled passed with evidence `sha256:847fe49418c09524ccd7f2a963fa41e6c5573b8e2254e13916b8ce6fc683598e`.
