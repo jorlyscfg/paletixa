@@ -103,6 +103,7 @@ begin
   then raise exception 'target is not eligible'; end if;
   select id into strict admin_role from public.roles where key='admin';
   delete from public.user_roles where user_id=p_from and role_id=admin_role;
+  if not found then raise exception 'source is not admin'; end if;
   insert into public.user_roles values(p_to,admin_role) on conflict do nothing;
   return true;
 end $$;

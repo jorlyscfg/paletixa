@@ -1,9 +1,11 @@
 import { execFile } from 'node:child_process'
+import { randomBytes } from 'node:crypto'
 import { promisify } from 'node:util'
 import { createClient, type InsForgeClient } from '@insforge/sdk'
 import { beforeAll, describe, expect, it } from 'vitest'
 
 const exec = promisify(execFile)
+const validationBranch = 'admin-branch-access-foundation-validation'
 const ids = {
   admin: '10000000-0000-0000-0000-000000000001', other: '10000000-0000-0000-0000-000000000002',
   inactive: '10000000-0000-0000-0000-000000000003', unverified: '10000000-0000-0000-0000-000000000004',
@@ -26,20 +28,26 @@ async function data<T>(operation: PromiseLike<{ data: T; error: unknown }>) {
 }
 
 beforeAll(async () => {
-  baseUrl = (await cli(['current'])).project.oss_host
+  const current = (await cli(['current'])).project
+  const branches = (await cli(['branch', 'list'])).data
+  const activeBranch = branches.find((branch) => branch.id === current.project_id)
+  const parent = activeBranch && await cli(['projects', 'get', '--project', activeBranch.parent_project_id])
+  if (activeBranch?.name !== validationBranch || activeBranch.branch_metadata?.mode !== 'schema-only' || parent?.name !== 'paletixa') throw new Error('Refusing privileged integration mutations outside the paletixa schema-only validation branch')
+  baseUrl = current.oss_host
+  const password = `${randomBytes(32).toString('base64url')}aA1!`
   await query(`
     insert into auth.users(id,email,password,email_verified) values
-      ('${ids.admin}','admin@example.invalid',crypt('ContractPass123!',gen_salt('bf')),true),
-      ('${ids.other}','other@example.invalid',crypt('ContractPass123!',gen_salt('bf')),true),
-      ('${ids.inactive}','inactive@example.invalid',crypt('ContractPass123!',gen_salt('bf')),true),
-      ('${ids.unverified}','unverified@example.invalid',crypt('ContractPass123!',gen_salt('bf')),true)
+      ('${ids.admin}','admin@example.invalid',crypt('${password}',gen_salt('bf')),true),
+      ('${ids.other}','other@example.invalid',crypt('${password}',gen_salt('bf')),true),
+      ('${ids.inactive}','inactive@example.invalid',crypt('${password}',gen_salt('bf')),true),
+      ('${ids.unverified}','unverified@example.invalid',crypt('${password}',gen_salt('bf')),true)
     on conflict(id) do update set password=excluded.password,email_verified=true;
     insert into public.profiles(user_id,is_active) values
       ('${ids.admin}',true),('${ids.other}',true),('${ids.inactive}',false),('${ids.unverified}',true)
     on conflict(user_id) do update set is_active=excluded.is_active`)
   for (const [key, id] of Object.entries(ids) as [keyof typeof ids, string][]) {
     const auth = createClient({ baseUrl })
-    const session = await data(auth.auth.signInWithPassword({ email: `${key}@example.invalid`, password: 'ContractPass123!' }))
+    const session = await data(auth.auth.signInWithPassword({ email: `${key}@example.invalid`, password }))
     clients[key] = createClient({ baseUrl, accessToken: session!.accessToken! })
     expect(session!.user.id).toBe(id)
   }
@@ -101,9 +109,14 @@ describe('operator bootstrap contracts', () => {
     await expect(query(`select public.bootstrap_first_admin('${ids.admin}','bootstrap-v2')`)).rejects.toThrow(/consumed/i)
     await query(`select public.revoke_admin_access('${ids.admin}')`)
     expect(await query('select count(*)::int n from public.bootstrap_receipt')).toEqual([{ n: 1 }])
+    const before = await query(`select count(*)::int n from public.user_roles ur join public.roles r on r.id=ur.role_id where r.key='admin'`)
+    await expect(query(`select public.reassign_admin_access('${ids.admin}','${ids.other}')`)).rejects.toThrow(/source is not admin/i)
+    expect(await query(`select count(*)::int n from public.user_roles ur join public.roles r on r.id=ur.role_id where r.key='admin'`)).toEqual(before)
+    await query(`insert into public.user_roles select '${ids.admin}',id from public.roles where key='admin'`)
     await query(`select public.reassign_admin_access('${ids.admin}','${ids.other}')`)
+    expect(await query(`select user_id from public.user_roles ur join public.roles r on r.id=ur.role_id where r.key='admin'`)).toEqual([{ user_id: ids.other }])
     await expect(data(clients.other.database.rpc('revoke_admin_access', { p_user_id: ids.other }))).rejects.toThrow()
-  }, 30_000)
+  }, 60_000)
 })
 
 describe('branch command receipt contracts', () => {

@@ -64,3 +64,6 @@
 - Deviations from design: InsForge 2.3.1 exposes `auth.users.email_verified`, not `email_confirmed_at`; the predicate checks `email_confirmed_at` when present and uses the platform's trusted `email_verified` field otherwise.
 - Issues: Bun was available at `$HOME/.bun/bin/bun` rather than on the default PATH; all evidence commands explicitly added that directory to PATH. The baseline lockfile was regenerated from the documented pre-PR package before restoring PR 1.
 - Backend mutation: migration and synthetic contract data exist only on schema-only branch `admin-branch-access-foundation-validation`; production remains unchanged and the prior branch was not reset.
+
+## Review Correction
+- Generation 6 for `review-d7347b0943c7efcf` fixed R1-001/R3-001: parent guard failed before SQL; validation branch integration passed 12/12 in 83.31s; lint/build passed; readback was 8 tables/1 policy/8 pinned functions/1 bootstrap receipt/5 command receipts/2 branches/1 admin grant; dry-run was 18 additions/0 modifications/0 conflicts; parent readback remained 0/0/0 and context returned to `paletixa`. Candidate: 400 lines; correction: 31 lines. Rollback only this section plus focused migration/test edits.
