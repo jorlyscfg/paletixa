@@ -5,9 +5,9 @@
 - Mode: Standard (`strict_tdd: false`)
 - Delivery strategy: `auto-chain`
 - Chain strategy: `stacked-to-main`
-- Current work unit: PR 3 — `pr3-authentication-branch-workspace` (review correction complete)
+- Current work unit: PR 4 — configuration and full verification (complete)
 - Future target: `main`
-- Runtime attempt token: `sha256:8afb1752134297fe40bc56c9e1f9f1a4295b145a2a39b65d6a4a3ace971a8719`
+- Runtime attempt token: `sha256:1c864de674e762133081d08dbd053160cde01b6a168f9e9565b8528094ba9279`
 - Auditable baseline commit: `6e7db8bc0354cacf9bb249bdfd9e3503fd00746e`; the PR 1 commit is its direct child, with the exact child hash persisted in Engram and the Result Contract because a commit cannot contain its own hash.
 
 ## Cumulative Task Status
@@ -25,8 +25,8 @@
 - [x] 3.2 Add the authentication boundary.
 - [x] 3.3 Add the branch workspace.
 - [x] 3.4 Wire application providers and protected states.
-- [ ] 4.1 Document development email verification behavior.
-- [ ] 4.2 Complete backend and rollout verification.
+- [x] 4.1 Document explicit audited confirmation for fictitious development accounts while verification remains enabled.
+- [x] 4.2 Complete safe fresh verification and bind prior irreversible-contract evidence.
 
 ## Work Unit Evidence
 
@@ -74,3 +74,22 @@
 - Correction: stale reads remain suppressible, while guarded serialized mutations always reconcile confirmed results; the overlap test proves refresh/create/status disabled and the result visible. API coverage binds `from('branches')`, returns 201 rows, and never calls `limit`.
 - Rollback: revert only `branches.ts`, `BranchWorkspace.tsx`, their focused tests, and this evidence line; auth, backend, tasks 4.x, and prior PR 3 behavior remain untouched.
 - Review `review-034dc41bca78498a` generation 10 recovery preserved R3-001/R4-001/R4-002 within 400 authored lines. Runtime token `sha256:69fe6d1328f3a1baeb95b7e328e55b70ac86c18c763e01c510f81472b9af62fb` settled passed with evidence `sha256:847fe49418c09524ccd7f2a963fa41e6c5573b8e2254e13916b8ce6fc683598e`.
+
+## PR 4 Work Unit Evidence
+
+| Evidence | Exact result |
+|---|---|
+| Focused test | `bun run test` exited 0: 3 files/16 tests in 5.79s. `bun run lint` exited 0. `bun run build` exited 0: 107 modules in 403ms. |
+| Runtime harness | Vite served HTTP 200/620 bytes with the root mount on `127.0.0.1:41742`; the process stopped. Impeccable detector returned `[]` for the app shell and admin/auth surfaces. |
+| Branch contracts | Metadata/readback found 8 tables with RLS, 1 SELECT policy, 8 pinned-path functions, 3 trusted-email predicates, 0 exposed operator functions, 1 bootstrap receipt, 5 command receipts, and 2 branches. |
+| Integration | Destructive integration was not rerun. Prior generation-6 evidence remains bound to this sole branch and migration `20260814025511`: 12/12 passed in 83.31s, including irreversible bootstrap and receipt contracts. |
+| Email behavior | Applied exactly one development-branch config change, `require_email_verification: false → true`, with no skipped fields. Fresh metadata reports verification enabled on branch and parent. Disabling verification is documented as neither trusted confirmation nor an approved path. |
+| Merge safety | Fresh dry-run reported 18 additions (8 tables, 1 policy, 8 functions, 1 migration), 0 modifications, 0 conflicts, and `applied:false`; saved SQL contains no `auth.config` or verification change. |
+| Production integrity | Parent readback remained 0 foundation tables, 0 functions, 0 policies, and real email verification enabled. CLI context was restored to parent. |
+| Rollback boundary | Revert the two PR4 docs and PR4 task/progress entries only. Backend rollback for this apply is limited to the separately approved development confirmation procedure; verification is already enabled and production needs no rollback. |
+
+## PR 4 Resolution
+
+- The maintainer replaced unsupported auto-verification with explicit, auditable confirmation restricted to fictitious development accounts. Development and production verification remain enabled.
+- No destructive integration, fixture deletion, reset, branch deletion, backend merge, commit, or push ran. CLI context returned to parent `paletixa`; production remains 0 foundation tables/functions/policies.
+- Git merge and backend merge are separate approval gates. Any real backend merge requires a later explicit approval naming the branch and reviewed clean dry-run.
