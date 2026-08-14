@@ -27,12 +27,12 @@ build_output_hash: sha256:5f3a4cfe609828917b8368cc2803db52ff0826541b5b666e8671f0
 | Metric | Value |
 |---|---:|
 | Tasks total | 15 |
-| Tasks complete | 15 |
-| Tasks incomplete | 0 |
+| Tasks complete | 14 |
+| Tasks incomplete | 1 |
 | Requirements complete | 4/6 |
 | Scenarios compliant | 11/13 |
 
-All proposal, specification, design, task, and apply-progress artifacts were read directly. Task completion permits full verification, but completion marks do not override missing scenario-level runtime proof.
+All proposal, specification, design, task, and apply-progress artifacts were read directly. Task 4.2 remains incomplete because two scenarios still lack complete passed runtime proof.
 
 ### Build & Tests Execution
 

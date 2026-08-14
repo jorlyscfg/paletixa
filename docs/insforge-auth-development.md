@@ -36,7 +36,7 @@ not require a branch reset and did not mutate production.
 ```bash
 npx -y @insforge/cli current
 npx -y @insforge/cli db query \
-  "select id,email,email_verified from auth.users where id='<USER_UUID>' and lower(email)=lower('<EMAIL>') and (lower(email) ~ '@([a-z0-9-]+\\.)*invalid$' or lower(email)=any(array['<ALLOWLISTED_EMAIL>']));" --json
+  "select id,email,email_verified from auth.users where id='<USER_UUID>' and lower(email)=lower('<EMAIL>') and (lower(email) ~ '@([a-z0-9-]+\\.)+invalid$' or lower(email)=any(array['<ALLOWLISTED_EMAIL>']));" --json
 ```
 
 3. After a second operator checks the branch, account, allowlist, and change
@@ -45,7 +45,7 @@ npx -y @insforge/cli db query \
 
 ```bash
 npx -y @insforge/cli db query \
-  "/* change_ref=<CHANGE_REF> dev-only fictitious confirmation */ update auth.users set email_verified=true where id='<USER_UUID>' and lower(email)=lower('<EMAIL>') and email_verified=false and (lower(email) ~ '@([a-z0-9-]+\\.)*invalid$' or lower(email)=any(array['<ALLOWLISTED_EMAIL>'])) returning id,email,email_verified;" --json
+  "/* change_ref=<CHANGE_REF> dev-only fictitious confirmation */ update auth.users set email_verified=true where id='<USER_UUID>' and lower(email)=lower('<EMAIL>') and email_verified=false and (lower(email) ~ '@([a-z0-9-]+\\.)+invalid$' or lower(email)=any(array['<ALLOWLISTED_EMAIL>'])) returning id,email,email_verified;" --json
 ```
 
 4. Require exactly one returned row with `email_verified: true`, then run a
@@ -72,7 +72,7 @@ access because server predicates continue checking trusted verification.
 
 ```bash
 npx -y @insforge/cli db query \
-  "/* change_ref=<CHANGE_REF> rollback dev-only confirmation */ update auth.users set email_verified=false where id='<USER_UUID>' and lower(email)=lower('<EMAIL>') and email_verified=true and (lower(email) ~ '@([a-z0-9-]+\\.)*invalid$' or lower(email)=any(array['<ALLOWLISTED_EMAIL>'])) returning id,email,email_verified;" --json
+  "/* change_ref=<CHANGE_REF> rollback dev-only confirmation */ update auth.users set email_verified=false where id='<USER_UUID>' and lower(email)=lower('<EMAIL>') and email_verified=true and (lower(email) ~ '@([a-z0-9-]+\\.)+invalid$' or lower(email)=any(array['<ALLOWLISTED_EMAIL>'])) returning id,email,email_verified;" --json
 ```
 
 Never perform confirmation or rollback on production. If CLI context cannot be

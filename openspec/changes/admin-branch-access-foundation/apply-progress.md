@@ -5,7 +5,7 @@
 - Mode: Standard (`strict_tdd: false`)
 - Delivery strategy: `auto-chain`
 - Chain strategy: `stacked-to-main`
-- Current work unit: PR 4 — configuration and full verification (complete)
+- Current work unit: PR 4 — configuration complete; final verification/remediation pending
 - Future target: `main`
 - Runtime attempt token: `sha256:1c864de674e762133081d08dbd053160cde01b6a168f9e9565b8528094ba9279`
 - Auditable baseline commit: `6e7db8bc0354cacf9bb249bdfd9e3503fd00746e`; the PR 1 commit is its direct child, with the exact child hash persisted in Engram and the Result Contract because a commit cannot contain its own hash.
@@ -26,7 +26,7 @@
 - [x] 3.3 Add the branch workspace.
 - [x] 3.4 Wire application providers and protected states.
 - [x] 4.1 Document explicit audited confirmation for fictitious development accounts while verification remains enabled.
-- [x] 4.2 Complete safe fresh verification and bind prior irreversible-contract evidence.
+- [ ] 4.2 Complete safe fresh verification and bind prior irreversible-contract evidence.
 
 ## Work Unit Evidence
 

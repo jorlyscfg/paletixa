@@ -52,4 +52,4 @@ PR integration order: PR 1 → main; PR 2 after PR 1 → main; PR 3 after PR 2 �
 ## Phase 4: Configuration and Verification
 
 - [x] 4.1 Document explicit, auditable confirmation for allowlisted fictitious development accounts while keeping verification enabled in development and production; verify server-side trusted-email checks remain enabled.
-- [x] 4.2 Run fresh safe source, HTTP, Impeccable, metadata, RLS/RPC, and dry-run checks; bind prior 12/12 evidence for irreversible contracts and document separately approved Git/backend rollout and compensating rollback.
+- [ ] 4.2 Run fresh safe source, HTTP, Impeccable, metadata, RLS/RPC, and dry-run checks; bind prior 12/12 evidence for irreversible contracts and document separately approved Git/backend rollout and compensating rollback.
