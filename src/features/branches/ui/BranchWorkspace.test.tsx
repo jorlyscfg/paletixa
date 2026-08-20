@@ -9,6 +9,7 @@ import * as productApi from '../../products/api/products'
 vi.mock('../../auth/api/adminAccess', () => ({ getAdminAccess: vi.fn(), signIn: vi.fn() }))
 vi.mock('../api/branches', () => ({ listBranches: vi.fn(), createBranch: vi.fn(), setBranchStatus: vi.fn() }))
 vi.mock('../../products/api/products', () => ({ listProducts: vi.fn(), createProduct: vi.fn(), updateProduct: vi.fn(), deactivateProduct: vi.fn() }))
+vi.mock('../../sales/api/sales', () => ({ SALES_CHANNELS: ['pos', 'wholesale', 'event'], recordSale: vi.fn() }))
 const branch = { id: 'branch-1', name: 'Central', status: 'active' as const }
 const deferred = <T,>() => {
   let resolve!: (value: T) => void
