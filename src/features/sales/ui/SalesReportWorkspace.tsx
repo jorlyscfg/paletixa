@@ -1,4 +1,7 @@
 import { type FormEvent, useCallback, useEffect, useRef, useState } from 'react'
+import { CustomDatePicker } from '../../../app/components/CustomDatePicker'
+import { InfoButton } from '../../../app/components/InfoButton'
+import { ResponsiveActionButton } from '../../../app/components/ResponsiveActionButton'
 import { getSalesByChannel, SALES_CHANNELS, type SalesChannel, type SalesChannelTotal, type SalesReportRange } from '../api/sales'
 
 type DateFields = { from: string; to: string }
@@ -20,6 +23,12 @@ function getDefaultDateRange(): DateFields {
 }
 
 const DEFAULT_DATE_RANGE = getDefaultDateRange()
+
+const channelDescriptions: Record<SalesChannel, string> = {
+  pos: 'Point-of-sale sales',
+  wholesale: 'Wholesale sales',
+  event: 'Event sales',
+}
 
 function dateAtUtc(value: string) {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return null
@@ -58,6 +67,7 @@ export function SalesReportWorkspace() {
   const [totals, setTotals] = useState<SalesChannelTotal[]>([])
   const [validationError, setValidationError] = useState('')
   const [loadError, setLoadError] = useState('')
+  const [scopeInfoOpen, setScopeInfoOpen] = useState(false)
   const sequence = useRef(0)
   const alert = useRef<HTMLDivElement>(null)
   const lastRange = useRef<SalesReportRange>(toApiRange(DEFAULT_DATE_RANGE))
@@ -106,39 +116,113 @@ export function SalesReportWorkspace() {
   const isLoading = loadState === 'loading'
   const totalSales = totals.reduce((sum, row) => sum + row.saleCount, 0)
   const combinedMxn = totals.reduce((sum, row) => sum + row.totalMxn, 0)
+  const maxChannelMxn = Math.max(...totals.map((row) => row.totalMxn), 0)
+  const progressMax = Math.max(maxChannelMxn, 1)
 
-  return <section aria-labelledby="sales-report-title" className="w-full">
-    <div>
-      <p className="font-medium text-sky-700">Reports</p>
-      <h1 id="sales-report-title" className="mt-1 text-3xl font-semibold tracking-tight sm:text-4xl">Sales report</h1>
-      <p className="mt-3 max-w-2xl text-slate-700">Review sales counts and MXN totals across POS, wholesale, and events.</p>
-    </div>
+  return <section aria-labelledby="sales-report-title" className="w-full rounded-3xl bg-slate-900 p-4 text-slate-100 shadow-2xl sm:p-6 lg:p-8">
+    <header className="flex flex-col gap-5 border-b border-slate-800 pb-6 sm:flex-row sm:items-start sm:justify-between">
+      <div className="min-w-0">
+        <div className="flex items-center gap-1.5">
+          <p className="text-[10px] font-black uppercase tracking-[0.18em] text-sky-400">Reports / sales visibility</p>
+          <InfoButton id="sales-report-scope-info" label="Explain sales report scope" open={scopeInfoOpen} onToggle={() => setScopeInfoOpen((current) => !current)}>
+            This MVP report includes only sales counts and MXN totals returned for POS, Wholesale, and Event in the selected range. It does not include inventory, purchases, branches, shifts, audit, tax, export, trend, or transaction detail data.
+          </InfoButton>
+        </div>
+        <h1 id="sales-report-title" className="mt-2 text-2xl font-black tracking-tight text-white sm:text-3xl">Sales report</h1>
+        <p className="mt-2 max-w-2xl text-sm leading-relaxed text-slate-400">Review the count and MXN total of sales across the three operating channels.</p>
+      </div>
+      <div className="flex shrink-0 flex-wrap items-center gap-2 text-[10px] font-black uppercase tracking-widest text-slate-400">
+        <span className="rounded-full border border-slate-700 bg-slate-950 px-3 py-1.5">Sales only</span>
+        <span className="rounded-full border border-slate-800 px-3 py-1.5">MXN</span>
+      </div>
+    </header>
 
-    <form aria-label="Sales report filters" className="mt-8 grid gap-4 rounded-2xl bg-white p-5 shadow-sm sm:grid-cols-[1fr_1fr_auto] sm:items-end" onSubmit={submit}>
-      <label className="grid gap-1.5 font-medium">Start date<input required type="date" value={dates.from} onChange={(event) => updateDate('from', event.target.value)} aria-invalid={Boolean(validationError)} disabled={isLoading} className="min-h-11 rounded-xl border border-slate-300 bg-white px-3 focus:outline-none focus:ring-2 focus:ring-sky-600 disabled:bg-slate-100" /></label>
-      <label className="grid gap-1.5 font-medium">End date<input required type="date" value={dates.to} onChange={(event) => updateDate('to', event.target.value)} aria-invalid={Boolean(validationError)} disabled={isLoading} className="min-h-11 rounded-xl border border-slate-300 bg-white px-3 focus:outline-none focus:ring-2 focus:ring-sky-600 disabled:bg-slate-100" /></label>
-      <button type="submit" disabled={isLoading} className="min-h-11 rounded-xl bg-slate-950 px-5 font-medium text-white focus:outline-none focus:ring-2 focus:ring-sky-600 focus:ring-offset-2 disabled:opacity-60">{isLoading ? 'Loading report…' : 'Refresh report'}</button>
+    <form aria-label="Sales report filters" className="mt-6 rounded-3xl border border-slate-800 bg-slate-950 p-4 shadow-xl sm:p-5" onSubmit={submit}>
+      <div className="grid gap-5 xl:grid-cols-[minmax(13rem,0.7fr)_minmax(0,1.8fr)] xl:items-end">
+        <div>
+          <p className="text-[10px] font-black uppercase tracking-widest text-slate-500">Analysis window</p>
+          <p className="mt-2 text-sm font-semibold text-slate-200">Choose a bounded date range</p>
+          <p className="mt-1 text-xs leading-relaxed text-slate-500">Up to 366 days. Results refresh only when submitted.</p>
+        </div>
+        <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)_auto] sm:items-end">
+          <label className="grid min-w-0 gap-2 text-xs font-bold uppercase tracking-widest text-slate-400">
+            <span>Start date</span>
+            <CustomDatePicker value={dates.from} onChange={(value) => updateDate('from', value)} ariaLabel="Start date" ariaInvalid={Boolean(validationError)} disabled={isLoading} className="!border-slate-800 !bg-slate-900 !text-slate-100 hover:!bg-slate-800" />
+          </label>
+          <span aria-hidden="true" className="hidden pb-3 text-[10px] font-black uppercase tracking-widest text-slate-600 sm:block">To</span>
+          <label className="grid min-w-0 gap-2 text-xs font-bold uppercase tracking-widest text-slate-400">
+            <span>End date</span>
+            <CustomDatePicker value={dates.to} onChange={(value) => updateDate('to', value)} ariaLabel="End date" ariaInvalid={Boolean(validationError)} disabled={isLoading} align="right" className="!border-slate-800 !bg-slate-900 !text-slate-100 hover:!bg-slate-800" />
+          </label>
+          <ResponsiveActionButton type="submit" label="Refresh report" loading={isLoading} loadingLabel="Loading report…" icon="refresh" mobileDisplay="text" className="w-full border border-sky-400/20 bg-sky-600 text-white shadow-lg shadow-sky-950/30 hover:bg-sky-500 sm:w-auto" />
+        </div>
+      </div>
     </form>
 
-    {validationError && <div ref={alert} tabIndex={-1} role="alert" className="mt-4 rounded-xl bg-amber-50 p-4 text-amber-950">{validationError}</div>}
-    <p role="status" aria-live="polite" aria-atomic="true" className="mt-4 min-h-6 text-sm font-medium text-slate-600">{isLoading ? 'Loading sales report…' : loadState === 'ready' ? 'Sales report loaded.' : ''}</p>
-    {loadState === 'loading' && <div aria-hidden="true" className="mt-4 grid gap-3 rounded-2xl bg-white p-4 shadow-sm sm:grid-cols-3"><div className="h-20 rounded-xl bg-slate-100" /><div className="h-20 rounded-xl bg-slate-100" /><div className="h-20 rounded-xl bg-slate-100" /></div>}
-    {loadState === 'error' && <div ref={alert} tabIndex={-1} role="alert" className="mt-4 rounded-xl bg-rose-50 p-4 text-rose-900"><p>{loadError}</p><p className="mt-1 text-sm">Check the connection and try again.</p><button type="button" className="mt-3 min-h-11 rounded-xl bg-rose-900 px-4 font-medium text-white focus:outline-none focus:ring-2 focus:ring-rose-700 focus:ring-offset-2" onClick={() => void load(lastRange.current)}>Try again</button></div>}
+    {validationError && <div ref={alert} tabIndex={-1} role="alert" className="mt-4 rounded-2xl border border-amber-500/30 bg-amber-500/10 p-4 text-sm font-medium text-amber-100">{validationError}</div>}
+    <p role="status" aria-live="polite" aria-atomic="true" className="mt-4 min-h-6 text-sm font-medium text-slate-400">{isLoading ? 'Loading sales report…' : loadState === 'ready' ? 'Sales report loaded.' : ''}</p>
 
-    {loadState === 'ready' && <div className="mt-4">
-      <div className="rounded-2xl bg-slate-950 p-5 text-white">
-        <p className="text-sm font-medium text-slate-300">Combined total</p>
-        <p className="mt-1 text-2xl font-semibold tracking-tight">{formatMxn(combinedMxn)}</p>
-        <p className="mt-1 text-sm text-slate-300">{totalSales} {totalSales === 1 ? 'sale' : 'sales'} in this date range</p>
+    {loadState === 'loading' && <div aria-hidden="true" className="mt-2 grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
+      <div className="h-40 rounded-3xl border border-slate-800 bg-slate-950" />
+      <div className="h-40 rounded-3xl border border-slate-800 bg-slate-950" />
+      <div className="h-40 rounded-3xl border border-slate-800 bg-slate-950" />
+      <div className="h-40 rounded-3xl border border-slate-800 bg-slate-950" />
+      <div className="h-40 rounded-3xl border border-slate-800 bg-slate-950" />
+    </div>}
+
+    {loadState === 'error' && <div ref={alert} tabIndex={-1} role="alert" className="mt-2 rounded-2xl border border-rose-500/30 bg-rose-500/10 p-4 text-rose-100">
+      <p className="font-semibold">{loadError}</p>
+      <p className="mt-1 text-sm text-rose-200/80">Check the connection and try again.</p>
+      <ResponsiveActionButton label="Try again" icon="refresh" mobileDisplay="text" onClick={() => void load(lastRange.current)} className="mt-4 border border-rose-400/20 bg-rose-600 text-white hover:bg-rose-500" />
+    </div>}
+
+    {loadState === 'ready' && <div className="mt-2 space-y-6">
+      <div className="grid gap-4 sm:grid-cols-2">
+        <article className="rounded-3xl border border-slate-800 bg-slate-950 p-5 shadow-xl">
+          <p className="text-[10px] font-black uppercase tracking-widest text-slate-500">Combined sales</p>
+          <p className="mt-3 text-3xl font-black tracking-tight text-white">{formatMxn(combinedMxn)}</p>
+          <p className="mt-3 border-t border-slate-800 pt-3 text-xs font-semibold text-slate-400">Total MXN value in the selected range</p>
+        </article>
+        <article className="rounded-3xl border border-slate-800 bg-slate-950 p-5 shadow-xl">
+          <p className="text-[10px] font-black uppercase tracking-widest text-slate-500">Sales count</p>
+          <p className="mt-3 text-3xl font-black tracking-tight text-white">{totalSales}</p>
+          <p className="mt-3 border-t border-slate-800 pt-3 text-xs font-semibold text-slate-400">{totalSales === 1 ? 'Sale' : 'Sales'} across POS, Wholesale, and Event</p>
+        </article>
       </div>
-      {totalSales === 0 && <p className="mt-4 rounded-xl bg-slate-100 p-4 text-slate-700">No sales were recorded for this date range.</p>}
-      <h2 className="mt-8 text-lg font-semibold">Sales by channel</h2>
-      <ul aria-label="Sales by channel" className="mt-3 divide-y divide-slate-200 rounded-2xl bg-white px-5 shadow-sm">
-        {totals.map((row) => <li key={row.channel} className="flex flex-col gap-3 py-5 sm:flex-row sm:items-center sm:justify-between">
-          <div><h3 className="font-semibold">{channelLabels[row.channel]}</h3><p className="mt-1 text-sm text-slate-600">{row.saleCount} {row.saleCount === 1 ? 'sale' : 'sales'}</p></div>
-          <p className="font-medium sm:text-right">{formatMxn(row.totalMxn)}</p>
-        </li>)}
-      </ul>
+
+      {totalSales === 0 && <div className="rounded-2xl border border-dashed border-slate-700 bg-slate-950/60 p-4 text-sm text-slate-300">
+        <p className="font-semibold">No sales were recorded for this date range.</p>
+        <p className="mt-1 text-xs text-slate-500">Try another date range to review reported sales.</p>
+      </div>}
+
+      <section aria-labelledby="sales-channel-title" className="rounded-3xl border border-slate-800 bg-slate-950 p-4 shadow-xl sm:p-5">
+        <div>
+          <h2 id="sales-channel-title" className="text-lg font-black text-white">Channel comparison</h2>
+          <p className="mt-1 text-xs leading-relaxed text-slate-500">MXN totals and sale counts for the selected range.</p>
+        </div>
+        <ul aria-label="Sales by channel" className="mt-5 grid min-w-0 gap-3 md:grid-cols-3">
+          {totals.map((row) => {
+            const barWidth = maxChannelMxn === 0 ? 0 : Math.min(100, Math.max(0, (row.totalMxn / maxChannelMxn) * 100))
+            return <li key={row.channel} className="min-w-0">
+              <article className="h-full rounded-2xl border border-slate-800 bg-slate-900 p-4">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <h3 className="truncate text-sm font-black text-white">{channelLabels[row.channel]}</h3>
+                    <p className="mt-1 truncate text-[10px] font-bold uppercase tracking-wider text-slate-500">{channelDescriptions[row.channel]}</p>
+                  </div>
+                  <span className="shrink-0 rounded-full border border-slate-700 px-2 py-1 text-[10px] font-black uppercase tracking-wider text-slate-400">MXN</span>
+                </div>
+                <p className="mt-6 text-xl font-black text-white">{formatMxn(row.totalMxn)}</p>
+                <p className="mt-1 text-xs font-semibold text-slate-400">{row.saleCount} {row.saleCount === 1 ? 'sale' : 'sales'}</p>
+                <div className="mt-5" role="progressbar" aria-label={`${channelLabels[row.channel]} sales value comparison`} aria-valuemin={0} aria-valuemax={progressMax} aria-valuenow={row.totalMxn} aria-valuetext={formatMxn(row.totalMxn)}>
+                  <div className="h-2 overflow-hidden rounded-full bg-slate-950 ring-1 ring-inset ring-slate-800"><span className="block h-full rounded-full bg-sky-500 transition-[width] duration-300" style={{ width: `${barWidth}%` }} /></div>
+                </div>
+                <p className="mt-2 text-[10px] font-semibold uppercase tracking-wider text-slate-600">Relative to highest channel total</p>
+              </article>
+            </li>
+          })}
+        </ul>
+      </section>
     </div>}
   </section>
 }

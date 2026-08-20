@@ -8,6 +8,8 @@ type CustomDatePickerProps = {
   placeholder?: string
   disabled?: boolean
   align?: 'left' | 'right'
+  ariaLabel?: string
+  ariaInvalid?: boolean
 }
 
 const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December']
@@ -34,7 +36,7 @@ function cellsFor(date: Date) {
   })
 }
 
-export function CustomDatePicker({ value, onChange, className = '', placeholder = 'Select a date', disabled = false, align = 'left' }: CustomDatePickerProps) {
+export function CustomDatePicker({ value, onChange, className = '', placeholder = 'Select a date', disabled = false, align = 'left', ariaLabel, ariaInvalid = false }: CustomDatePickerProps) {
   const selected = useMemo(() => parseDate(value), [value])
   const [open, setOpen] = useState(false)
   const [navDate, setNavDate] = useState(() => selected ?? new Date())
@@ -61,7 +63,7 @@ export function CustomDatePicker({ value, onChange, className = '', placeholder 
   function moveMonth(amount: number) { setNavDate(new Date(navDate.getFullYear(), navDate.getMonth() + amount, 1)) }
 
   return <div ref={rootRef} className="relative w-full">
-    <button type="button" disabled={disabled} aria-label={label} aria-haspopup="dialog" aria-expanded={open} onClick={() => setOpen((current) => !current)} className={`ops-control ops-focus flex min-h-11 w-full items-center justify-between gap-3 px-3.5 text-left ${className}`}>
+    <button type="button" disabled={disabled} aria-label={ariaLabel ? `${ariaLabel}: ${label}` : label} aria-invalid={ariaInvalid || undefined} aria-haspopup="dialog" aria-expanded={open} onClick={() => setOpen((current) => !current)} className={`ops-control ops-focus flex min-h-11 w-full items-center justify-between gap-3 px-3.5 text-left ${className}`}>
       <span className="flex min-w-0 items-center gap-2 truncate"><Icon name="calendar" className="h-4 w-4 shrink-0 text-slate-500" />{label}</span><Icon name="chevron-down" className={`h-4 w-4 shrink-0 text-slate-500 transition-transform ${open ? 'rotate-180' : ''}`} />
     </button>
     {open && <div role="dialog" aria-label="Calendar" className={`ops-popover absolute top-full z-50 mt-2 w-[23rem] max-w-[calc(100vw-2rem)] overflow-x-auto p-4 ${align === 'right' ? 'right-0' : 'left-0'}`}>

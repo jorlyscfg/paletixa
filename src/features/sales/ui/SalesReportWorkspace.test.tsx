@@ -11,6 +11,19 @@ const totals: salesApi.SalesChannelTotal[] = [
   { channel: 'event', saleCount: 0, totalMxn: 0 },
 ]
 
+function dateInputValue(date: Date) {
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`
+}
+
+function longDateValue(date: Date) {
+  return date.toLocaleDateString('en-US', { dateStyle: 'long' })
+}
+
+function selectDate(label: string, date: Date) {
+  fireEvent.click(screen.getByRole('button', { name: new RegExp(`^${label}:`) }))
+  fireEvent.click(screen.getByRole('button', { name: longDateValue(date) }))
+}
+
 describe('sales report workspace', () => {
   afterEach(cleanup)
   beforeEach(() => {
@@ -21,9 +34,20 @@ describe('sales report workspace', () => {
   it('shows combined and per-channel totals', async () => {
     render(<SalesReportWorkspace />)
     expect(await screen.findByText('$172.50 MXN')).toBeInTheDocument()
+    expect(screen.getByText('Combined sales').closest('article')).toHaveTextContent('$172.50 MXN')
+    expect(screen.getByText('Sales count').closest('article')).toHaveTextContent('3')
     expect(screen.getByRole('heading', { name: 'POS' }).closest('li')).toHaveTextContent('2 sales')
     expect(screen.getByRole('heading', { name: 'Wholesale' }).closest('li')).toHaveTextContent('$72.50 MXN')
     expect(screen.getByRole('heading', { name: 'Event' }).closest('li')).toHaveTextContent('0 sales')
+  })
+
+  it('renders one comparison bar per channel using the returned MXN totals', async () => {
+    render(<SalesReportWorkspace />)
+    expect(await screen.findByText('Sales report loaded.')).toBeInTheDocument()
+    expect(screen.getAllByRole('progressbar')).toHaveLength(3)
+    expect(screen.getByRole('progressbar', { name: 'POS sales value comparison' })).toHaveAttribute('aria-valuenow', '100')
+    expect(screen.getByRole('progressbar', { name: 'Wholesale sales value comparison' })).toHaveAttribute('aria-valuenow', '72.5')
+    expect(screen.getByRole('progressbar', { name: 'Event sales value comparison' })).toHaveAttribute('aria-valuenow', '0')
   })
 
   it('keeps zero channels visible when the API omits them', async () => {
@@ -38,12 +62,34 @@ describe('sales report workspace', () => {
     render(<SalesReportWorkspace />)
     await screen.findByText('Sales report loaded.')
     const calls = vi.mocked(salesApi.getSalesByChannel).mock.calls.length
-    fireEvent.change(screen.getByLabelText('Start date'), { target: { value: '2026-08-21' } })
-    fireEvent.change(screen.getByLabelText('End date'), { target: { value: '2026-08-20' } })
+    const today = new Date()
+    const yesterday = new Date(today)
+    yesterday.setDate(yesterday.getDate() - 1)
+    selectDate('Start date', today)
+    selectDate('End date', yesterday)
     fireEvent.click(screen.getByRole('button', { name: 'Refresh report' }))
     expect(screen.getByRole('alert')).toHaveTextContent('start date must be on or before')
     expect(screen.getByRole('alert')).toHaveFocus()
     expect(salesApi.getSalesByChannel).toHaveBeenCalledTimes(calls)
+  })
+
+  it('submits the selected date picker range to the report API', async () => {
+    render(<SalesReportWorkspace />)
+    await screen.findByText('Sales report loaded.')
+    const start = new Date()
+    start.setDate(start.getDate() - 2)
+    const end = new Date()
+    selectDate('Start date', start)
+    selectDate('End date', end)
+    fireEvent.click(screen.getByRole('button', { name: 'Refresh report' }))
+    await screen.findByText('Sales report loaded.')
+
+    const expectedEnd = new Date(`${dateInputValue(end)}T00:00:00.000Z`)
+    expectedEnd.setUTCDate(expectedEnd.getUTCDate() + 1)
+    expect(salesApi.getSalesByChannel).toHaveBeenLastCalledWith({
+      from: `${dateInputValue(start)}T00:00:00.000Z`,
+      to: expectedEnd.toISOString(),
+    })
   })
 
   it('announces loading while a report request is pending', async () => {
