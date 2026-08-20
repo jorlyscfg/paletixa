@@ -41,8 +41,33 @@ describe('admin product workspace', () => {
     vi.mocked(productApi.listProducts).mockReturnValue(new Promise((done) => { resolve = done }))
     renderProtected()
     expect(await screen.findByText('Cargando productos…')).toHaveAttribute('role', 'status')
+    expect(screen.queryByRole('form', { name: 'Crear producto' })).not.toBeInTheDocument()
     resolve([])
     expect(await screen.findByText('Aún no hay productos. Agrega el primero para iniciar el catálogo compartido.')).toBeInTheDocument()
+    expect(screen.queryByRole('form', { name: 'Crear producto' })).not.toBeInTheDocument()
+  })
+
+  it('opens the product form from the header and closes it with Escape, close, or Cancel', async () => {
+    renderProtected(); await screen.findByText('Aún no hay productos. Agrega el primero para iniciar el catálogo compartido.')
+    expect(screen.getByRole('heading', { name: 'Productos' })).toBeInTheDocument()
+    expect(screen.getByRole('searchbox', { name: 'Buscar productos' }).closest('header')).not.toBeNull()
+    expect(screen.getByRole('button', { name: 'Agregar producto' })).toHaveTextContent('+')
+    expect(screen.queryByRole('form', { name: 'Crear producto' })).not.toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Agregar producto' }))
+    expect(screen.getByRole('dialog', { name: 'Agregar producto' })).toBeInTheDocument()
+    expect(document.body.style.overflow).toBe('hidden')
+    fireEvent.keyDown(document, { key: 'Escape' })
+    expect(screen.queryByRole('dialog', { name: 'Agregar producto' })).not.toBeInTheDocument()
+    expect(document.body.style.overflow).toBe('')
+
+    fireEvent.click(screen.getByRole('button', { name: 'Agregar producto' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Cerrar formulario de producto' }))
+    expect(screen.queryByRole('dialog', { name: 'Agregar producto' })).not.toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Agregar producto' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Cancelar' }))
+    expect(screen.queryByRole('dialog', { name: 'Agregar producto' })).not.toBeInTheDocument()
   })
 
   it('filters catalog cards by search terms and category', async () => {
@@ -61,6 +86,7 @@ describe('admin product workspace', () => {
     expect(screen.getByText('con chile')).toBeInTheDocument()
 
     const search = screen.getByRole('searchbox', { name: 'Buscar productos' })
+    expect(search.closest('header')).not.toBeNull()
     fireEvent.change(search, { target: { value: 'straw' } })
     expect(screen.getByRole('heading', { name: 'Strawberry' })).toBeInTheDocument()
     expect(screen.queryByRole('heading', { name: 'Mango' })).not.toBeInTheDocument()
@@ -78,16 +104,17 @@ describe('admin product workspace', () => {
   it('creates a product from the catalog form', async () => {
     vi.mocked(productApi.createProduct).mockResolvedValue(product)
     renderProtected(); await screen.findByText('Aún no hay productos. Agrega el primero para iniciar el catálogo compartido.')
+    fireEvent.click(screen.getByRole('button', { name: 'Agregar producto' }))
     fireEvent.change(screen.getByLabelText('Nombre'), { target: { value: 'Mango' } }); fireEvent.change(screen.getByLabelText('SKU / código'), { target: { value: 'M-01' } }); fireEvent.change(screen.getByLabelText('Categoría'), { target: { value: 'Paletas' } }); fireEvent.change(screen.getByLabelText('Precio de menudeo (MXN)'), { target: { value: '42.5' } }); fireEvent.change(screen.getByLabelText('Precio mayorista (MXN)'), { target: { value: '35' } }); fireEvent.change(screen.getByLabelText('Etiquetas'), { target: { value: 'fruta' } }); fireEvent.keyDown(screen.getByLabelText('Etiquetas'), { key: 'Enter' })
     fireEvent.submit(screen.getByRole('form', { name: 'Crear producto' }))
-    expect(await screen.findByText('Producto creado.')).toBeInTheDocument(); expect(productApi.createProduct).toHaveBeenCalledWith({ name: 'Mango', sku: 'M-01', category: 'Paletas', retailPriceMxn: 42.5, wholesalePriceMxn: 35, tags: ['fruta'], active: true })
+    expect(await screen.findByText('Producto creado.')).toBeInTheDocument(); expect(screen.queryByRole('dialog')).not.toBeInTheDocument(); expect(productApi.createProduct).toHaveBeenCalledWith({ name: 'Mango', sku: 'M-01', category: 'Paletas', retailPriceMxn: 42.5, wholesalePriceMxn: 35, tags: ['fruta'], active: true })
   })
 
   it('updates and deactivates an existing product', async () => {
     vi.mocked(productApi.listProducts).mockResolvedValue([product]); vi.mocked(productApi.updateProduct).mockResolvedValue({ ...product, name: 'Mango Grande' }); vi.mocked(productApi.deactivateProduct).mockResolvedValue({ ...product, active: false })
     renderProtected(); await screen.findByRole('heading', { name: 'Mango' })
-    fireEvent.click(screen.getByRole('button', { name: 'Editar Mango' })); fireEvent.change(screen.getByLabelText('Nombre'), { target: { value: 'Mango Grande' } }); fireEvent.submit(screen.getByRole('form', { name: 'Editar Mango' }))
-    expect(await screen.findByText('Producto actualizado.')).toBeInTheDocument(); expect(productApi.updateProduct).toHaveBeenCalledWith('product-1', expect.objectContaining({ name: 'Mango Grande' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Editar Mango' })); expect(screen.getByRole('dialog', { name: 'Editar Mango' })).toBeInTheDocument(); fireEvent.change(screen.getByLabelText('Nombre'), { target: { value: 'Mango Grande' } }); fireEvent.submit(screen.getByRole('form', { name: 'Editar Mango' }))
+    expect(await screen.findByText('Producto actualizado.')).toBeInTheDocument(); expect(screen.queryByRole('dialog')).not.toBeInTheDocument(); expect(productApi.updateProduct).toHaveBeenCalledWith('product-1', expect.objectContaining({ name: 'Mango Grande' }))
     fireEvent.click(screen.getByRole('button', { name: 'Desactivar Mango Grande' })); expect(await screen.findByText('Producto desactivado.')).toBeInTheDocument(); expect(productApi.deactivateProduct).toHaveBeenCalledWith('product-1')
   })
 
@@ -97,6 +124,7 @@ describe('admin product workspace', () => {
     vi.mocked(productApi.createProduct).mockResolvedValue(created)
     vi.mocked(productApi.replaceProductImage).mockResolvedValue(uploaded)
     renderProtected(); await screen.findByText('Aún no hay productos. Agrega el primero para iniciar el catálogo compartido.')
+    fireEvent.click(screen.getByRole('button', { name: 'Agregar producto' }))
 
     const file = new File(['image'], 'mango.webp', { type: 'image/webp' })
     fireEvent.change(screen.getByLabelText('Seleccionar imagen'), { target: { files: [file] } })
@@ -109,6 +137,7 @@ describe('admin product workspace', () => {
 
   it('shows a validation error for unsupported image files', async () => {
     renderProtected(); await screen.findByText('Aún no hay productos. Agrega el primero para iniciar el catálogo compartido.')
+    fireEvent.click(screen.getByRole('button', { name: 'Agregar producto' }))
     fireEvent.change(screen.getByLabelText('Seleccionar imagen'), { target: { files: [new File(['svg'], 'mango.svg', { type: 'image/svg+xml' })] } })
     expect(screen.getByRole('alert', { name: '' })).toHaveTextContent('Selecciona una imagen JPEG, PNG o WebP.')
     expect(productApi.createProduct).not.toHaveBeenCalled()

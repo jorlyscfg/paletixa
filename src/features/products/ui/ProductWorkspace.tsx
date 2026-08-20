@@ -1,4 +1,4 @@
-import { type ChangeEvent, type FormEvent, useCallback, useEffect, useRef, useState } from 'react'
+import { type ChangeEvent, type FormEvent, useCallback, useEffect, useId, useRef, useState } from 'react'
 import { CatalogImageTile } from '../../../app/components/CatalogImageTile'
 import { ResponsiveActionButton } from '../../../app/components/ResponsiveActionButton'
 import { SearchInput } from '../../../app/components/SearchInput'
@@ -49,12 +49,14 @@ function ProductForm({
   product,
   tagSuggestions,
   busy,
+  headingId,
   onCancel,
   onSubmit,
 }: {
   product: Product | null
   tagSuggestions: string[]
   busy: boolean
+  headingId: string
   onCancel: () => void
   onSubmit: (draft: Draft) => void
 }) {
@@ -148,7 +150,7 @@ function ProductForm({
   return <form key={product?.id ?? 'new'} aria-label={product ? `Editar ${product.name}` : 'Crear producto'} className="grid gap-5 rounded-3xl border border-slate-800 bg-slate-950 p-4 shadow-xl sm:p-6" onSubmit={submit}>
     <div>
       <p className="text-[11px] font-black uppercase tracking-[0.16em] text-sky-400">Configuración del catálogo</p>
-      <h2 className="mt-2 text-lg font-extrabold tracking-tight text-white">{product ? `Editar ${product.name}` : 'Agregar producto'}</h2>
+      <h2 id={headingId} className="mt-2 text-lg font-extrabold tracking-tight text-white">{product ? `Editar ${product.name}` : 'Agregar producto'}</h2>
       <p className="mt-1 text-sm leading-relaxed text-slate-400">Mantén el catálogo compartido listo para Punto de venta, Mayoristas y Eventos.</p>
     </div>
     <div className="grid gap-4 sm:grid-cols-2">
@@ -197,15 +199,93 @@ function ProductForm({
     <label className="flex min-h-11 items-center gap-3 text-sm font-semibold text-slate-300"><input name="active" type="checkbox" defaultChecked={initial.active} className="h-5 w-5 accent-sky-500" />Activo en los canales de venta</label>
     <div className="flex flex-col gap-3 sm:flex-row">
       <ResponsiveActionButton type="submit" label={product ? 'Guardar producto' : 'Crear producto'} loading={busy} loadingLabel="Guardando producto" mobileDisplay="text" disabled={busy} className="bg-sky-600 text-white shadow-lg shadow-sky-950/30 hover:bg-sky-500 disabled:opacity-50">{product ? 'Guardar producto' : 'Crear producto'}</ResponsiveActionButton>
-      {product && <ResponsiveActionButton type="button" label="Cancelar edición" mobileDisplay="text" disabled={busy} className="border border-slate-700 bg-slate-900 text-slate-300 hover:bg-slate-800" onClick={onCancel}>Cancelar</ResponsiveActionButton>}
+      <ResponsiveActionButton type="button" label={product ? 'Cancelar edición' : 'Cancelar'} mobileDisplay="text" disabled={busy} className="border border-slate-700 bg-slate-900 text-slate-300 hover:bg-slate-800" onClick={onCancel}>Cancelar</ResponsiveActionButton>
     </div>
   </form>
+}
+
+function ProductModal({
+  product,
+  tagSuggestions,
+  busy,
+  error,
+  errorRef,
+  onClose,
+  onSubmit,
+}: {
+  product: Product | null
+  tagSuggestions: string[]
+  busy: boolean
+  error: string
+  errorRef: React.RefObject<HTMLDivElement | null>
+  onClose: () => void
+  onSubmit: (draft: Draft) => void
+}) {
+  const dialogRef = useRef<HTMLDivElement>(null)
+  const closeButtonRef = useRef<HTMLButtonElement>(null)
+  const headingId = useId()
+  const busyRef = useRef(false)
+
+  useEffect(() => {
+    busyRef.current = busy
+  }, [busy])
+
+  const requestClose = useCallback(() => {
+    if (!busyRef.current) onClose()
+  }, [onClose])
+
+  useEffect(() => {
+    const previousActiveElement = document.activeElement instanceof HTMLElement ? document.activeElement : null
+    const previousOverflow = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    closeButtonRef.current?.focus()
+
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === 'Escape') {
+        event.preventDefault()
+        requestClose()
+        return
+      }
+
+      if (event.key !== 'Tab') return
+      const focusableElements = dialogRef.current?.querySelectorAll<HTMLElement>('button:not([disabled]), input:not([disabled]), [href], select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])')
+      if (!focusableElements || focusableElements.length === 0) return
+
+      const firstFocusableElement = focusableElements[0]
+      const lastFocusableElement = focusableElements[focusableElements.length - 1]
+      if (event.shiftKey && document.activeElement === firstFocusableElement) {
+        event.preventDefault()
+        lastFocusableElement.focus()
+      } else if (!event.shiftKey && document.activeElement === lastFocusableElement) {
+        event.preventDefault()
+        firstFocusableElement.focus()
+      }
+    }
+
+    document.addEventListener('keydown', handleKeyDown)
+    return () => {
+      document.removeEventListener('keydown', handleKeyDown)
+      document.body.style.overflow = previousOverflow
+      previousActiveElement?.focus()
+    }
+  }, [requestClose])
+
+  return <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-950/80 p-4 backdrop-blur-sm sm:p-6" onClick={(event) => { if (event.target === event.currentTarget) requestClose() }}>
+    <div ref={dialogRef} role="dialog" aria-modal="true" aria-labelledby={headingId} className="mx-auto max-h-[calc(100vh-2rem)] w-full max-w-3xl overflow-y-auto rounded-3xl border border-slate-700 bg-slate-900 shadow-2xl sm:max-h-[calc(100vh-3rem)]">
+      <div className="flex items-center justify-end border-b border-slate-800 px-4 py-3 sm:px-6">
+        <button ref={closeButtonRef} type="button" aria-label="Cerrar formulario de producto" title="Cerrar formulario de producto" disabled={busy} className="ops-action ops-focus inline-flex min-h-11 min-w-11 items-center justify-center rounded-xl border border-slate-700 bg-slate-950 text-2xl leading-none text-slate-200 hover:border-sky-500 hover:bg-slate-800 disabled:pointer-events-none disabled:opacity-50" onClick={requestClose}>×</button>
+      </div>
+      {error && <div ref={errorRef} tabIndex={-1} role="alert" className="mx-4 mt-4 rounded-2xl border border-rose-500/20 bg-rose-500/10 p-4 text-sm font-semibold text-rose-300 sm:mx-6">{error}</div>}
+      <div className="p-4 sm:p-6"><ProductForm product={product} tagSuggestions={tagSuggestions} busy={busy} headingId={headingId} onCancel={requestClose} onSubmit={onSubmit} /></div>
+    </div>
+  </div>
 }
 
 export function ProductWorkspace() {
   const [products, setProducts] = useState<Product[]>([])
   const [state, setState] = useState<'loading' | 'ready' | 'error'>('loading')
   const [editing, setEditing] = useState<Product | null>(null)
+  const [formOpen, setFormOpen] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
   const [selectedCategory, setSelectedCategory] = useState(ALL_CATEGORIES)
   const [notice, setNotice] = useState('')
@@ -230,6 +310,25 @@ export function ProductWorkspace() {
 
   useEffect(() => { queueMicrotask(() => void load()) }, [load])
   useEffect(() => { if (state === 'error' || error) alert.current?.focus() }, [state, error])
+
+  const closeForm = useCallback(() => {
+    setFormOpen(false)
+    setEditing(null)
+  }, [])
+
+  function openCreateForm() {
+    setError('')
+    setNotice('')
+    setEditing(null)
+    setFormOpen(true)
+  }
+
+  function openEditForm(product: Product) {
+    setError('')
+    setNotice('')
+    setEditing(product)
+    setFormOpen(true)
+  }
 
   function merge(product: Product) {
     setProducts((items) => [...items.filter(({ id }) => id !== product.id), product].sort((a, b) => a.name.localeCompare(b.name)))
@@ -282,6 +381,7 @@ export function ProductWorkspace() {
 
     merge(result)
     setEditing(null)
+    setFormOpen(false)
     setState('ready')
     setNotice(editingExisting ? 'Producto actualizado.' : 'Producto creado.')
     setBusy(false)
@@ -308,30 +408,25 @@ export function ProductWorkspace() {
   const filteredProducts = products.filter((product) => matchesProduct(product, searchQuery, selectedCategory))
 
   return <section aria-labelledby="products-title" className="w-full rounded-3xl bg-slate-900 p-4 text-slate-100 shadow-2xl sm:p-6 lg:p-8">
-    <div className="flex flex-col gap-5 sm:flex-row sm:items-end sm:justify-between">
-      <div>
-        <p className="text-[11px] font-black uppercase tracking-[0.18em] text-sky-400">Administración / Catálogo</p>
-        <h1 id="products-title" className="mt-2 text-3xl font-black tracking-tight text-white sm:text-4xl">Catálogo</h1>
-        <p className="mt-3 max-w-2xl text-sm leading-relaxed text-slate-400 sm:text-base">Un catálogo visual para Punto de venta, Mayoristas y Eventos. Los productos activos aparecen en cada canal de venta.</p>
+    <header className="flex flex-col gap-4 border-b border-slate-800 pb-5 sm:flex-row sm:items-center sm:justify-between">
+      <h1 id="products-title" className="text-3xl font-black tracking-tight text-white sm:text-4xl">Productos</h1>
+      <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:items-center">
+        <SearchInput label="Buscar productos" value={searchQuery} onChange={setSearchQuery} placeholder="Busca por nombre, SKU, categoría o etiqueta…" containerClassName="w-full sm:w-80" className="border-slate-800 bg-slate-950 text-sm text-white placeholder:text-slate-500" />
+        <ResponsiveActionButton type="button" label="Agregar producto" mobileDisplay="text" className="min-w-11 border border-sky-500/40 bg-sky-600 px-3 text-xl font-black leading-none text-white shadow-lg shadow-sky-950/30 hover:bg-sky-500 sm:w-11" onClick={openCreateForm}>+</ResponsiveActionButton>
       </div>
-      <ResponsiveActionButton label="Actualizar productos" icon="refresh" loading={state === 'loading'} loadingLabel="Actualizando productos" mobileDisplay="text" disabled={busy} className="w-full border border-slate-700 bg-slate-950 text-slate-200 hover:bg-slate-800 sm:w-auto" onClick={load}>Actualizar productos</ResponsiveActionButton>
-    </div>
+    </header>
 
-    <div className="mt-6"><ProductForm product={editing} tagSuggestions={tagSuggestions} busy={busy} onCancel={() => setEditing(null)} onSubmit={save} /></div>
     <p aria-live="polite" className="mt-4 min-h-5 text-sm font-semibold text-emerald-300">{notice}</p>
-    {error && <div ref={alert} tabIndex={-1} role="alert" className="mt-4 rounded-2xl border border-rose-500/20 bg-rose-500/10 p-4 text-sm font-semibold text-rose-300">{error}</div>}
+    {error && !formOpen && <div ref={alert} tabIndex={-1} role="alert" className="mt-4 rounded-2xl border border-rose-500/20 bg-rose-500/10 p-4 text-sm font-semibold text-rose-300">{error}</div>}
 
     {state === 'loading' && <p role="status" className="mt-8 rounded-2xl border border-slate-800 bg-slate-950 p-6 text-sm font-semibold text-slate-300">Cargando productos…</p>}
     {state === 'error' && <div ref={alert} tabIndex={-1} role="alert" className="mt-8 rounded-2xl border border-rose-500/20 bg-rose-500/10 p-4 text-sm text-rose-200"><p className="font-semibold">No se pudieron cargar los productos.</p><ResponsiveActionButton label="Reintentar" mobileDisplay="text" className="mt-3 bg-rose-900 text-white hover:bg-rose-800" onClick={load}>Reintentar</ResponsiveActionButton></div>}
     {state === 'ready' && products.length === 0 && <p className="mt-8 rounded-2xl border border-slate-800 bg-slate-950 p-6 text-sm text-slate-300">Aún no hay productos. Agrega el primero para iniciar el catálogo compartido.</p>}
 
     {state === 'ready' && products.length > 0 && <div className="mt-6 rounded-3xl border border-slate-800 bg-slate-950 p-4 sm:p-6">
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h2 className="text-lg font-extrabold text-white">Productos del catálogo</h2>
-          <p className="mt-1 text-xs font-semibold text-slate-400">{filteredProducts.length} de {products.length} productos mostrados</p>
-        </div>
-        <SearchInput label="Buscar productos" value={searchQuery} onChange={setSearchQuery} placeholder="Busca por nombre, SKU, categoría o etiqueta…" containerClassName="w-full sm:max-w-xs" className="border-slate-800 bg-slate-900 text-sm text-white placeholder:text-slate-500" />
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <p className="text-xs font-semibold text-slate-400">{filteredProducts.length} de {products.length} productos mostrados</p>
+        <ResponsiveActionButton label="Actualizar productos" icon="refresh" mobileDisplay="text" disabled={busy} className="w-full border border-slate-700 bg-slate-900 text-slate-200 hover:bg-slate-800 sm:w-auto" onClick={load}>Actualizar productos</ResponsiveActionButton>
       </div>
 
       <div role="tablist" aria-label="Categorías de productos" className="mt-5 flex w-full min-w-0 gap-1.5 overflow-x-auto border-b border-slate-800 pb-3 scrollbar-none">
@@ -361,11 +456,12 @@ export function ProductWorkspace() {
             </div>
           </div>
           <div className="mt-4 grid gap-2 sm:grid-cols-2">
-            <ResponsiveActionButton label={`Editar ${product.name}`} mobileDisplay="text" disabled={busy} className="w-full border border-slate-700 bg-slate-950 text-slate-200 hover:bg-slate-800" onClick={() => setEditing(product)}>Editar</ResponsiveActionButton>
+            <ResponsiveActionButton label={`Editar ${product.name}`} mobileDisplay="text" disabled={busy} className="w-full border border-slate-700 bg-slate-950 text-slate-200 hover:bg-slate-800" onClick={() => openEditForm(product)}>Editar</ResponsiveActionButton>
             <ResponsiveActionButton label={`${product.active ? 'Desactivar' : 'Activar'} ${product.name}`} mobileDisplay="text" disabled={busy} className={`w-full border ${product.active ? 'border-rose-500/30 bg-rose-500/10 text-rose-300 hover:bg-rose-500/20' : 'border-emerald-500/30 bg-emerald-500/10 text-emerald-300 hover:bg-emerald-500/20'}`} onClick={() => void setActive(product)}>{product.active ? 'Desactivar' : 'Activar'}</ResponsiveActionButton>
           </div>
         </li>)}
       </ul>}
     </div>}
+    {formOpen && <ProductModal product={editing} tagSuggestions={tagSuggestions} busy={busy} error={error} errorRef={alert} onClose={closeForm} onSubmit={save} />}
   </section>
 }
