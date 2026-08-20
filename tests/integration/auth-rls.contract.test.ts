@@ -2,7 +2,7 @@ import { execFile } from 'node:child_process'
 import { randomBytes } from 'node:crypto'
 import { promisify } from 'node:util'
 import { createClient, type InsForgeClient } from '@insforge/sdk'
-import { beforeAll, describe, expect, it } from 'vitest'
+import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 
 const exec = promisify(execFile)
 const validationBranch = 'admin-branch-access-foundation-validation'
@@ -11,8 +11,15 @@ const ids = {
   inactive: '10000000-0000-0000-0000-000000000003', unverified: '10000000-0000-0000-0000-000000000004',
 }
 const clients = {} as Record<keyof typeof ids, InsForgeClient>
+const repeatable = process.env.AUTH_RLS_REPEATABLE === '1'
+const fixture = {
+  userId: crypto.randomUUID(), requestId: crypto.randomUUID(),
+  email: `contract-${crypto.randomUUID()}@example.invalid`,
+  name: `Contract ${crypto.randomUUID()}`,
+}
 let baseUrl: string
 let branchId: string
+let repeatableClient: InsForgeClient
 
 async function cli(command: string[]) {
   const { stdout } = await exec('npx', ['-y', '@insforge/cli', ...command, '--json'], {
@@ -27,14 +34,28 @@ async function data<T>(operation: PromiseLike<{ data: T; error: unknown }>) {
   return result.data
 }
 
-beforeAll(async () => {
+async function assertValidationBranch() {
   const current = (await cli(['current'])).project
   const branches = (await cli(['branch', 'list'])).data
   const activeBranch = branches.find((branch) => branch.id === current.project_id)
   const parent = activeBranch && await cli(['projects', 'get', '--project', activeBranch.parent_project_id])
   if (activeBranch?.name !== validationBranch || activeBranch.branch_metadata?.mode !== 'schema-only' || parent?.name !== 'paletixa') throw new Error('Refusing privileged integration mutations outside the paletixa schema-only validation branch')
+  return current
+}
+
+beforeAll(async () => {
+  const current = await assertValidationBranch()
   baseUrl = current.oss_host
   const password = `${randomBytes(32).toString('base64url')}aA1!`
+  if (repeatable) {
+    await query(`insert into auth.users(id,email,password,email_verified) values ('${fixture.userId}','${fixture.email}',crypt('${password}',gen_salt('bf')),true);
+      insert into public.profiles(user_id,is_active) values ('${fixture.userId}',true);
+      insert into public.user_roles select '${fixture.userId}',id from public.roles where key='admin'`)
+    const auth = createClient({ baseUrl })
+    const session = await data(auth.auth.signInWithPassword({ email: fixture.email, password }))
+    repeatableClient = createClient({ baseUrl, accessToken: session!.accessToken! })
+    return
+  }
   await query(`
     insert into auth.users(id,email,password,email_verified) values
       ('${ids.admin}','admin@example.invalid',crypt('${password}',gen_salt('bf')),true),
@@ -54,7 +75,22 @@ beforeAll(async () => {
   await query(`update auth.users set email_verified=false where id='${ids.unverified}'`)
 }, 30_000)
 
-describe('authorization and direct RLS contracts', () => {
+afterAll(async () => {
+  if (!repeatable) return
+  await assertValidationBranch()
+  await query(`with receipts as (delete from public.branch_command_receipts where actor_id='${fixture.userId}' and request_id='${fixture.requestId}' returning branch_id),
+    branches as (delete from public.branches where id in (select branch_id from receipts) returning id)
+    delete from auth.users where id='${fixture.userId}'`)
+  expect(await query(`select
+    (select count(*)::int from auth.users where id='${fixture.userId}') users,
+    (select count(*)::int from public.profiles where user_id='${fixture.userId}') profiles,
+    (select count(*)::int from public.user_roles where user_id='${fixture.userId}') roles,
+    (select count(*)::int from public.branch_command_receipts where actor_id='${fixture.userId}') receipts,
+    (select count(*)::int from public.branches where name='${fixture.name}') branches`))
+    .toEqual([{ users: 0, profiles: 0, roles: 0, receipts: 0, branches: 0 }])
+}, 30_000)
+
+describe.skipIf(repeatable)('authorization and direct RLS contracts', () => {
   it.each(['unverified', 'inactive', 'other'] as const)('denies %s at context, RLS, and both RPC boundaries', async (key) => {
     expect(await data(clients[key].database.rpc('get_admin_context'))).toEqual([
       expect.objectContaining({ authorized: false }),
@@ -84,7 +120,7 @@ describe('authorization and direct RLS contracts', () => {
   }, 15_000)
 })
 
-describe('operator bootstrap contracts', () => {
+describe.skipIf(repeatable)('operator bootstrap contracts', () => {
   it('rejects unverified/inactive targets atomically before consumption', async () => {
     await expect(query(`select public.bootstrap_first_admin('${ids.unverified}','bootstrap-v1')`)).rejects.toThrow(/eligible/i)
     await expect(query(`select public.bootstrap_first_admin('${ids.inactive}','bootstrap-v1')`)).rejects.toThrow(/eligible/i)
@@ -119,7 +155,7 @@ describe('operator bootstrap contracts', () => {
   }, 60_000)
 })
 
-describe('branch command receipt contracts', () => {
+describe.skipIf(repeatable)('branch command receipt contracts', () => {
   it('replays matching create, rejects divergence, and serializes concurrency', async () => {
     const request = crypto.randomUUID()
     const create = (name: string) => data<{ branch_id: string }[]>(clients.other.database.rpc('create_branch', { p_request_id: request, p_name: name }))
@@ -163,4 +199,16 @@ describe('branch command receipt contracts', () => {
       await expect(data(clients.other.database.from(table).delete().eq(column, value))).rejects.toThrow()
     }
   }, 30_000)
+})
+
+describe.skipIf(!repeatable)('repeatable authorized branch projection contracts', () => {
+  it('returns complete listing and normalized active creation projections', async () => {
+    await assertValidationBranch()
+    const created = await data<{ branch_id: string, name: string, result_status: string }[]>(repeatableClient.database.rpc('create_branch', {
+      p_request_id: fixture.requestId, p_name: `  ${fixture.name}  `,
+    }))
+    expect(created).toEqual([{ branch_id: expect.any(String), name: fixture.name, result_status: 'active' }])
+    const listed = await data(repeatableClient.database.from('branches').select('id,name,status').eq('id', created[0].branch_id))
+    expect(listed).toEqual([{ id: created[0].branch_id, name: fixture.name, status: 'active' }])
+  }, 20_000)
 })
