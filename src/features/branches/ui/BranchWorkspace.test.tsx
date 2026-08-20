@@ -5,11 +5,12 @@ import App from '../../../App'
 import * as authApi from '../../auth/api/adminAccess'
 import * as branchApi from '../api/branches'
 import * as productApi from '../../products/api/products'
+import * as salesApi from '../../sales/api/sales'
 
 vi.mock('../../auth/api/adminAccess', () => ({ getAdminAccess: vi.fn(), signIn: vi.fn() }))
 vi.mock('../api/branches', () => ({ listBranches: vi.fn(), createBranch: vi.fn(), setBranchStatus: vi.fn() }))
 vi.mock('../../products/api/products', () => ({ listProducts: vi.fn(), createProduct: vi.fn(), updateProduct: vi.fn(), deactivateProduct: vi.fn() }))
-vi.mock('../../sales/api/sales', () => ({ SALES_CHANNELS: ['pos', 'wholesale', 'event'], recordSale: vi.fn() }))
+vi.mock('../../sales/api/sales', () => ({ SALES_CHANNELS: ['pos', 'wholesale', 'event'], recordSale: vi.fn(), getSalesByChannel: vi.fn() }))
 const branch = { id: 'branch-1', name: 'Central', status: 'active' as const }
 const deferred = <T,>() => {
   let resolve!: (value: T) => void
@@ -23,6 +24,7 @@ describe('admin branch workspace', () => {
     vi.mocked(authApi.getAdminAccess).mockResolvedValue(true)
     vi.mocked(branchApi.listBranches).mockResolvedValue([])
     vi.mocked(productApi.listProducts).mockResolvedValue([])
+    vi.mocked(salesApi.getSalesByChannel).mockResolvedValue([])
   })
   it('shows one generic denial and never requests protected data', async () => {
     vi.mocked(authApi.getAdminAccess).mockResolvedValue(false)
