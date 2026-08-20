@@ -4,9 +4,11 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import App from '../../../App'
 import * as authApi from '../../auth/api/adminAccess'
 import * as branchApi from '../api/branches'
+import * as productApi from '../../products/api/products'
 
 vi.mock('../../auth/api/adminAccess', () => ({ getAdminAccess: vi.fn(), signIn: vi.fn() }))
 vi.mock('../api/branches', () => ({ listBranches: vi.fn(), createBranch: vi.fn(), setBranchStatus: vi.fn() }))
+vi.mock('../../products/api/products', () => ({ listProducts: vi.fn(), createProduct: vi.fn(), updateProduct: vi.fn(), deactivateProduct: vi.fn() }))
 const branch = { id: 'branch-1', name: 'Central', status: 'active' as const }
 const deferred = <T,>() => {
   let resolve!: (value: T) => void
@@ -19,6 +21,7 @@ describe('admin branch workspace', () => {
     vi.resetAllMocks()
     vi.mocked(authApi.getAdminAccess).mockResolvedValue(true)
     vi.mocked(branchApi.listBranches).mockResolvedValue([])
+    vi.mocked(productApi.listProducts).mockResolvedValue([])
   })
   it('shows one generic denial and never requests protected data', async () => {
     vi.mocked(authApi.getAdminAccess).mockResolvedValue(false)
