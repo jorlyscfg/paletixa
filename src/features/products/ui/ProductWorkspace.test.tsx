@@ -56,8 +56,13 @@ describe('admin product workspace', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Agregar producto' }))
     const dialog = screen.getByRole('dialog', { name: 'Agregar producto' })
+    const heading = screen.getByRole('heading', { name: 'Agregar producto' })
+    const modalHeader = heading.parentElement
     expect(dialog).toBeInTheDocument()
-    expect(screen.getByRole('heading', { name: 'Agregar producto' })).toBeInTheDocument()
+    expect(heading).toBeInTheDocument()
+    expect(modalHeader).toHaveClass('flex', 'shrink-0', 'justify-between')
+    expect(screen.getByRole('button', { name: 'Cerrar formulario de producto' }).parentElement).toBe(modalHeader)
+    expect(screen.getByRole('form', { name: 'Crear producto' })).not.toContainElement(heading)
     expect(screen.queryByText('Configuración del catálogo')).not.toBeInTheDocument()
     expect(screen.queryByText('Mantén el catálogo compartido listo para Punto de venta, Mayoristas y Eventos.')).not.toBeInTheDocument()
     expect(dialog).toHaveClass('flex', 'min-h-0', 'flex-col', 'overflow-hidden')
