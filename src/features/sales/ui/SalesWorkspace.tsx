@@ -9,7 +9,9 @@ type QuantityByProduct = Record<string, string>
 type LoadState = 'loading' | 'ready' | 'error'
 type Submission = { status: 'submitting' | 'error' | 'success'; requestId: string; receipt?: SaleReceipt }
 
-const channelLabels: Record<SalesChannel, string> = { pos: 'POS', wholesale: 'Wholesale', event: 'Event' }
+const channelLabels: Record<SalesChannel, string> = { pos: 'Punto de venta', wholesale: 'Mayoristas', event: 'Eventos' }
+const channelPriceLabels: Record<SalesChannel, string> = { pos: 'menudeo', wholesale: 'mayoreo', event: 'menudeo' }
+const ALL_CATEGORIES = 'Todas las categorías'
 const selectedChannelClass = 'bg-sky-600 text-white shadow-lg shadow-sky-950/30'
 const inactiveChannelClass = 'text-slate-300 hover:bg-slate-800 hover:text-white'
 const selectedCategoryClass = 'border-sky-400 bg-sky-500/15 text-sky-200'
@@ -48,12 +50,12 @@ function createRequestId() {
   return typeof randomUUID === 'function' ? randomUUID.call(globalThis.crypto) : `sale-${Date.now()}-${Math.random().toString(36).slice(2)}`
 }
 
-export function SalesWorkspace() {
+export function SalesWorkspace({ initialChannel = 'pos' }: { initialChannel?: SalesChannel }) {
   const [products, setProducts] = useState<Product[]>([])
   const [loadState, setLoadState] = useState<LoadState>('loading')
-  const [channel, setChannel] = useState<SalesChannel>('pos')
+  const [channel, setChannel] = useState<SalesChannel>(initialChannel)
   const [searchQuery, setSearchQuery] = useState('')
-  const [selectedCategory, setSelectedCategory] = useState('All')
+  const [selectedCategory, setSelectedCategory] = useState(ALL_CATEGORIES)
   const [quantities, setQuantities] = useState<QuantityByProduct>({})
   const [reviewed, setReviewed] = useState(false)
   const [validationError, setValidationError] = useState('')
@@ -126,11 +128,11 @@ export function SalesWorkspace() {
       return value.trim() !== '' && parseQuantity(value) === null
     })
     if (hasInvalidQuantity) {
-      setValidationError('Use a positive whole number for each selected product.')
+      setValidationError('Usa un número entero positivo para cada producto seleccionado.')
       return
     }
     if (items.length === 0) {
-      setValidationError('Select at least one product by adding it to the sale.')
+      setValidationError('Selecciona al menos un producto para agregarlo a la venta.')
       return
     }
     setValidationError('')
@@ -157,9 +159,9 @@ export function SalesWorkspace() {
 
   const isSubmitting = submission?.status === 'submitting'
   const isComplete = submission?.status === 'success'
-  const categories = ['All', ...Array.from(new Set(products.map((product) => product.category).filter(Boolean)))]
+  const categories = [ALL_CATEGORIES, ...Array.from(new Set(products.map((product) => product.category).filter(Boolean)))]
   const filteredProducts = products.filter((product) => {
-    const matchesCategory = selectedCategory === 'All' || product.category === selectedCategory
+    const matchesCategory = selectedCategory === ALL_CATEGORIES || product.category === selectedCategory
     return matchesCategory && matchesSearch(product, searchQuery)
   })
   const cartProducts = products.filter((product) => (quantities[product.id] ?? '').trim() !== '')
@@ -170,19 +172,19 @@ export function SalesWorkspace() {
   return <section aria-labelledby="sales-title" className="w-full rounded-[1.75rem] border border-slate-800 bg-slate-950 p-4 text-slate-100 shadow-xl sm:p-6 lg:p-8">
     <div className="flex flex-wrap items-end justify-between gap-4">
       <div>
-        <p className="text-xs font-bold uppercase tracking-[0.16em] text-sky-400">Sales desk</p>
-        <h1 id="sales-title" className="mt-2 text-2xl font-black tracking-tight text-white sm:text-3xl">Record a sale</h1>
-        <p className="mt-2 max-w-2xl text-sm leading-relaxed text-slate-400">Choose a channel, add products to the cart, and review the server-confirmed total before submitting.</p>
+        <p className="text-xs font-bold uppercase tracking-[0.16em] text-sky-400">{channelLabels[channel]}</p>
+        <h1 id="sales-title" className="mt-2 text-2xl font-black tracking-tight text-white sm:text-3xl">Registrar una venta</h1>
+        <p className="mt-2 max-w-2xl text-sm leading-relaxed text-slate-400">Elige un canal, agrega productos al carrito y revisa el total confirmado por el servidor antes de registrarlo.</p>
       </div>
       <ResponsiveActionButton
         type="button"
-        label="Refresh products"
+        label="Actualizar productos"
         icon="refresh"
         mobileDisplay="text"
         disabled={loadState === 'loading' || isSubmitting}
         onClick={() => void load()}
         className="border border-slate-700 bg-slate-900 text-slate-200 hover:bg-slate-800"
-      >Refresh products</ResponsiveActionButton>
+      >Actualizar productos</ResponsiveActionButton>
     </div>
 
     <form onSubmit={reviewSale} className="mt-7 grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(19rem,24rem)]">
@@ -190,12 +192,12 @@ export function SalesWorkspace() {
         <section aria-labelledby="channel-title" className="border-b border-slate-800 pb-5">
           <div className="flex flex-wrap items-end justify-between gap-3">
             <div>
-              <h2 id="channel-title" className="text-sm font-bold uppercase tracking-[0.12em] text-slate-300">Sales channel</h2>
-              <p className="mt-1 text-xs text-slate-500">POS and events use retail prices. Wholesale uses wholesale prices.</p>
+              <h2 id="channel-title" className="text-sm font-bold uppercase tracking-[0.12em] text-slate-300">Canal de venta</h2>
+              <p className="mt-1 text-xs text-slate-500">Punto de venta y Eventos usan precios de menudeo. Mayoristas usa precios mayoristas.</p>
             </div>
-            <span className="text-xs font-semibold text-slate-500">{products.length} active {products.length === 1 ? 'product' : 'products'}</span>
+            <span className="text-xs font-semibold text-slate-500">{products.length} productos activos</span>
           </div>
-          <div role="tablist" aria-label="Sales channel" className="mt-4 grid grid-cols-3 gap-1 rounded-2xl border border-slate-800 bg-slate-900/70 p-1">
+          <div role="tablist" aria-label="Canal de venta" className="mt-4 grid grid-cols-3 gap-1 rounded-2xl border border-slate-800 bg-slate-900/70 p-1">
             {SALES_CHANNELS.map((option) => <ResponsiveActionButton
               key={option}
               id={`${option}-tab`}
@@ -213,31 +215,31 @@ export function SalesWorkspace() {
         </section>
 
         {loadState === 'loading' && <div role="status" className="mt-6">
-          <p className="text-sm font-semibold text-slate-300">Loading products…</p>
+          <p className="text-sm font-semibold text-slate-300">Cargando productos…</p>
           <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-4">
             {[1, 2, 3, 4].map((placeholder) => <div key={placeholder} aria-hidden="true" className="aspect-[4/5] animate-pulse rounded-2xl border border-slate-800 bg-slate-900/70" />)}
           </div>
         </div>}
 
         {loadState === 'error' && <div ref={alert} tabIndex={-1} role="alert" className="mt-6 rounded-2xl border border-rose-500/30 bg-rose-500/10 p-4 text-rose-100">
-          <p className="font-semibold">Products could not be loaded.</p>
-          <p className="mt-1 text-sm text-rose-200/80">Check the catalog connection and try again.</p>
-          <ResponsiveActionButton type="button" label="Try again" icon="refresh" mobileDisplay="text" onClick={() => void load()} className="mt-4 bg-rose-600 text-white hover:bg-rose-500">Try again</ResponsiveActionButton>
+          <p className="font-semibold">No se pudieron cargar los productos.</p>
+          <p className="mt-1 text-sm text-rose-200/80">Revisa la conexión con el catálogo e inténtalo de nuevo.</p>
+          <ResponsiveActionButton type="button" label="Reintentar" icon="refresh" mobileDisplay="text" onClick={() => void load()} className="mt-4 bg-rose-600 text-white hover:bg-rose-500">Reintentar</ResponsiveActionButton>
         </div>}
 
-        {loadState === 'ready' && products.length === 0 && <p className="mt-6 rounded-2xl border border-dashed border-slate-700 bg-slate-900/50 p-6 text-sm text-slate-300">No active products are in the catalog. Add an active product before recording a sale.</p>}
+        {loadState === 'ready' && products.length === 0 && <p className="mt-6 rounded-2xl border border-dashed border-slate-700 bg-slate-900/50 p-6 text-sm text-slate-300">No hay productos activos en el catálogo. Agrega un producto activo antes de registrar una venta.</p>}
 
         {loadState === 'ready' && products.length > 0 && <div id="sale-products" role="tabpanel" aria-labelledby={`${channel}-tab`} className="mt-6">
           <div className="flex flex-col gap-4">
             <SearchInput
-              label="Search products"
+              label="Buscar productos"
               value={searchQuery}
               onChange={setSearchQuery}
-              placeholder="Search by product, SKU, or category"
+              placeholder="Busca por producto, SKU o categoría"
               containerClassName="w-full"
               className="border-slate-800 bg-slate-900/80 text-white placeholder:text-slate-500"
             />
-            <div role="tablist" aria-label="Product categories" className="flex min-w-0 gap-2 overflow-x-auto pb-1">
+            <div role="tablist" aria-label="Categorías de productos" className="flex min-w-0 gap-2 overflow-x-auto pb-1">
               {categories.map((category) => <ResponsiveActionButton
                 key={category}
                 type="button"
@@ -253,15 +255,15 @@ export function SalesWorkspace() {
 
           <div className="mt-5 flex items-center justify-between gap-3">
             <div>
-              <h2 className="text-sm font-bold uppercase tracking-[0.12em] text-slate-300">Product catalog</h2>
-              <p className="mt-1 text-xs text-slate-500">Tap add to build the sale. Quantities can be adjusted in the cart.</p>
+              <h2 className="text-sm font-bold uppercase tracking-[0.12em] text-slate-300">Catálogo de productos</h2>
+              <p className="mt-1 text-xs text-slate-500">Toca Agregar para armar la venta. Ajusta las cantidades en el carrito.</p>
             </div>
-            <span className="shrink-0 text-xs font-semibold text-slate-500">{filteredProducts.length} shown</span>
+            <span className="shrink-0 text-xs font-semibold text-slate-500">{filteredProducts.length} mostrados</span>
           </div>
 
           {filteredProducts.length === 0 ? <div className="mt-4 rounded-2xl border border-dashed border-slate-700 bg-slate-900/40 p-8 text-center">
-            <p className="text-sm font-semibold text-slate-300">No products match these filters.</p>
-            <ResponsiveActionButton type="button" label="Clear product filters" mobileDisplay="text" onClick={() => { setSearchQuery(''); setSelectedCategory('All') }} className="mt-4 border border-slate-700 bg-slate-800 text-slate-200 hover:bg-slate-700">Clear filters</ResponsiveActionButton>
+            <p className="text-sm font-semibold text-slate-300">No hay productos que coincidan con estos filtros.</p>
+            <ResponsiveActionButton type="button" label="Limpiar filtros de productos" mobileDisplay="text" onClick={() => { setSearchQuery(''); setSelectedCategory(ALL_CATEGORIES) }} className="mt-4 border border-slate-700 bg-slate-800 text-slate-200 hover:bg-slate-700">Limpiar filtros</ResponsiveActionButton>
           </div> : <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-4">
             {filteredProducts.map((product) => {
               const quantity = parseQuantity(quantities[product.id] ?? '') ?? 0
@@ -273,21 +275,21 @@ export function SalesWorkspace() {
                   imageClassName="transition-transform duration-200 group-hover:scale-105"
                   className="aspect-square w-full border-slate-800 bg-slate-950"
                 >
-                  {quantity > 0 && <span className="absolute right-2 top-2 rounded-full border border-sky-400/30 bg-sky-500/90 px-2 py-1 text-[10px] font-black text-white">{quantity} in cart</span>}
+                  {quantity > 0 && <span className="absolute right-2 top-2 rounded-full border border-sky-400/30 bg-sky-500/90 px-2 py-1 text-[10px] font-black text-white">{quantity} en el carrito</span>}
                 </CatalogImageTile>
                 <div className="mt-3 min-w-0">
                   <h3 className="truncate text-sm font-bold text-white" title={product.name}>{product.name}</h3>
                   <p className="mt-1 truncate text-[11px] font-semibold uppercase tracking-wide text-slate-500">{product.category} · {product.sku}</p>
-                  <p className="mt-2 text-xs font-semibold text-slate-300">{channelLabels[channel]} price <span className="font-black text-white">{formatMxn(price)}</span></p>
+                  <p className="mt-2 text-xs font-semibold text-slate-300">Precio de {channelPriceLabels[channel]} <span className="font-black text-white">{formatMxn(price)}</span></p>
                 </div>
                 <ResponsiveActionButton
                   type="button"
-                  label={`${quantity > 0 ? 'Add another' : 'Add'} ${product.name} to sale`}
+                  label={`${quantity > 0 ? 'Agregar otra unidad de' : 'Agregar'} ${product.name} a la venta`}
                   mobileDisplay="text"
                   disabled={isSubmitting || isComplete}
                   onClick={() => addProduct(product.id)}
                   className="mt-3 w-full border border-slate-700 bg-slate-950 text-slate-200 hover:border-sky-500 hover:text-white"
-                >{quantity > 0 ? 'Add more' : 'Add to sale'}</ResponsiveActionButton>
+                >{quantity > 0 ? 'Agregar más' : 'Agregar a la venta'}</ResponsiveActionButton>
               </article>
             })}
           </div>}
@@ -297,15 +299,15 @@ export function SalesWorkspace() {
       <aside aria-labelledby={reviewed ? 'review-title' : 'cart-title'} className={`h-fit rounded-2xl border bg-slate-900/85 p-4 shadow-xl lg:sticky lg:top-6 ${reviewed ? 'border-sky-500/40' : 'border-slate-800'}`}>
         <div className="flex items-start justify-between gap-3 border-b border-slate-800 pb-4">
           <div>
-            <h2 id={reviewed ? 'review-title' : 'cart-title'} className="text-base font-black text-white">{reviewed ? 'Review sale' : 'Cart summary'}</h2>
-            <p className="mt-1 text-xs text-slate-500">{channelLabels[channel]} · {itemCount} {itemCount === 1 ? 'item' : 'items'}</p>
+            <h2 id={reviewed ? 'review-title' : 'cart-title'} className="text-base font-black text-white">{reviewed ? 'Revisar venta' : 'Resumen del carrito'}</h2>
+            <p className="mt-1 text-xs text-slate-500">{channelLabels[channel]} · {itemCount} {itemCount === 1 ? 'artículo' : 'artículos'}</p>
           </div>
-          {cartProducts.length > 0 && <ResponsiveActionButton type="button" label="Clear sale selection" icon="close" mobileDisplay="text" onClick={clearCart} disabled={isSubmitting || isComplete} className="text-xs text-slate-400 hover:bg-slate-800 hover:text-white">Clear</ResponsiveActionButton>}
+          {cartProducts.length > 0 && <ResponsiveActionButton type="button" label="Vaciar selección de venta" icon="close" mobileDisplay="text" onClick={clearCart} disabled={isSubmitting || isComplete} className="text-xs text-slate-400 hover:bg-slate-800 hover:text-white">Vaciar</ResponsiveActionButton>}
         </div>
 
         {cartProducts.length === 0 ? <div className="py-10 text-center">
-          <p className="text-sm font-semibold text-slate-300">Cart is empty.</p>
-          <p className="mt-2 text-xs leading-relaxed text-slate-500">Add products from the catalog to start a sale.</p>
+          <p className="text-sm font-semibold text-slate-300">El carrito está vacío.</p>
+          <p className="mt-2 text-xs leading-relaxed text-slate-500">Agrega productos del catálogo para iniciar una venta.</p>
         </div> : <ul className="divide-y divide-slate-800">
           {cartProducts.map((product) => {
             const value = quantities[product.id] ?? ''
@@ -316,15 +318,15 @@ export function SalesWorkspace() {
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
                   <h3 className="truncate text-sm font-bold text-white" title={product.name}>{product.name}</h3>
-                  <p className="mt-1 text-xs text-slate-500">{channelLabels[channel]} · {formatMxn(price)} / unit</p>
+                  <p className="mt-1 text-xs text-slate-500">{channelLabels[channel]} · {formatMxn(price)} / unidad</p>
                 </div>
                 <span className="shrink-0 text-sm font-black text-white">{quantity === null ? '—' : formatMxn(quantity * price)}</span>
               </div>
               <div className="mt-3 flex items-center justify-between gap-3">
-                <div role="group" aria-label={`Quantity controls for ${product.name}`} className="flex items-center rounded-xl border border-slate-700 bg-slate-950 p-1">
-                  <button type="button" aria-label={`Decrease ${product.name} quantity`} disabled={isSubmitting || isComplete} onClick={() => adjustQuantity(product.id, -1)} className="ops-focus inline-flex h-11 w-11 items-center justify-center rounded-lg text-lg font-bold text-slate-400 hover:bg-slate-800 hover:text-white disabled:opacity-50">−</button>
+                <div role="group" aria-label={`Controles de cantidad para ${product.name}`} className="flex items-center rounded-xl border border-slate-700 bg-slate-950 p-1">
+                  <button type="button" aria-label={`Disminuir cantidad de ${product.name}`} disabled={isSubmitting || isComplete} onClick={() => adjustQuantity(product.id, -1)} className="ops-focus inline-flex h-11 w-11 items-center justify-center rounded-lg text-lg font-bold text-slate-400 hover:bg-slate-800 hover:text-white disabled:opacity-50">−</button>
                   <input
-                    aria-label={`Quantity for ${product.name}`}
+                    aria-label={`Cantidad de ${product.name}`}
                     aria-invalid={invalid}
                     disabled={isSubmitting || isComplete}
                     inputMode="numeric"
@@ -333,37 +335,37 @@ export function SalesWorkspace() {
                     onChange={(event) => changeQuantity(product.id, event.target.value)}
                     className="min-h-11 w-14 border-0 bg-transparent px-1 text-center text-sm font-black text-white outline-none focus:ring-2 focus:ring-sky-500"
                   />
-                  <button type="button" aria-label={`Increase ${product.name} quantity`} disabled={isSubmitting || isComplete} onClick={() => adjustQuantity(product.id, 1)} className="ops-focus inline-flex h-11 w-11 items-center justify-center rounded-lg text-lg font-bold text-slate-400 hover:bg-slate-800 hover:text-white disabled:opacity-50">+</button>
+                  <button type="button" aria-label={`Aumentar cantidad de ${product.name}`} disabled={isSubmitting || isComplete} onClick={() => adjustQuantity(product.id, 1)} className="ops-focus inline-flex h-11 w-11 items-center justify-center rounded-lg text-lg font-bold text-slate-400 hover:bg-slate-800 hover:text-white disabled:opacity-50">+</button>
                 </div>
-                {invalid ? <span className="text-right text-[11px] font-semibold text-amber-300">Use a whole number</span> : <span className="text-xs font-semibold text-slate-500">{quantity} {quantity === 1 ? 'unit' : 'units'}</span>}
+                {invalid ? <span className="text-right text-[11px] font-semibold text-amber-300">Usa un número entero</span> : <span className="text-xs font-semibold text-slate-500">{quantity} {quantity === 1 ? 'unidad' : 'unidades'}</span>}
               </div>
             </li>
           })}
         </ul>}
 
         <div className="mt-4 border-t border-slate-800 pt-4">
-          <div className="flex items-center justify-between gap-3 text-sm font-bold text-slate-300"><span>Display estimate</span><span className="text-lg font-black text-sky-300">{formatMxn(displayEstimate)}</span></div>
-          <p className="mt-2 text-xs leading-relaxed text-slate-500">The final total is confirmed by the server when you submit.</p>
+          <div className="flex items-center justify-between gap-3 text-sm font-bold text-slate-300"><span>Estimación visible</span><span className="text-lg font-black text-sky-300">{formatMxn(displayEstimate)}</span></div>
+          <p className="mt-2 text-xs leading-relaxed text-slate-500">El total final lo confirma el servidor al registrar la venta.</p>
         </div>
 
         {validationError && <div ref={alert} tabIndex={-1} role="alert" className="mt-4 rounded-xl border border-amber-500/30 bg-amber-500/10 p-3 text-sm text-amber-100">{validationError}</div>}
         {submission?.status === 'error' && <div ref={alert} tabIndex={-1} role="alert" className="mt-4 rounded-xl border border-rose-500/30 bg-rose-500/10 p-3 text-rose-100">
-          <p className="text-sm font-semibold">The sale could not be recorded. Try again.</p>
-          <ResponsiveActionButton type="button" label="Retry sale" icon="refresh" mobileDisplay="text" onClick={() => void submitSale()} className="mt-3 w-full bg-rose-600 text-white hover:bg-rose-500">Retry sale</ResponsiveActionButton>
+          <p className="text-sm font-semibold">No se pudo registrar la venta. Inténtalo de nuevo.</p>
+          <ResponsiveActionButton type="button" label="Reintentar venta" icon="refresh" mobileDisplay="text" onClick={() => void submitSale()} className="mt-3 w-full bg-rose-600 text-white hover:bg-rose-500">Reintentar venta</ResponsiveActionButton>
         </div>}
 
         {submission?.status === 'success' && submission.receipt && <div role="status" className="mt-4 rounded-xl border border-emerald-500/30 bg-emerald-500/10 p-4 text-emerald-100">
-          <h3 className="font-bold">{submission.receipt.replayed ? 'Sale already recorded' : 'Sale recorded'}</h3>
+          <h3 className="font-bold">{submission.receipt.replayed ? 'La venta ya estaba registrada' : 'Venta registrada'}</h3>
           <dl className="mt-3 grid gap-2 text-sm">
-            <div className="flex justify-between gap-4"><dt>Channel</dt><dd className="font-semibold">{channelLabels[submission.receipt.channel]}</dd></div>
-            <div className="flex justify-between gap-4"><dt>Server total</dt><dd className="font-semibold">{formatMxn(submission.receipt.totalMxn)}</dd></div>
-            <div className="flex justify-between gap-4"><dt>Receipt ID</dt><dd className="max-w-[12rem] truncate font-semibold" title={submission.receipt.id}>{submission.receipt.id}</dd></div>
+            <div className="flex justify-between gap-4"><dt>Canal</dt><dd className="font-semibold">{channelLabels[submission.receipt.channel]}</dd></div>
+            <div className="flex justify-between gap-4"><dt>Total confirmado</dt><dd className="font-semibold">{formatMxn(submission.receipt.totalMxn)}</dd></div>
+            <div className="flex justify-between gap-4"><dt>ID del recibo</dt><dd className="max-w-[12rem] truncate font-semibold" title={submission.receipt.id}>{submission.receipt.id}</dd></div>
           </dl>
-          <ResponsiveActionButton type="button" label="Start another sale" icon="refresh" mobileDisplay="text" onClick={startAnotherSale} className="mt-4 w-full border border-emerald-400/40 text-emerald-100 hover:bg-emerald-500/10">Start another sale</ResponsiveActionButton>
+          <ResponsiveActionButton type="button" label="Iniciar otra venta" icon="refresh" mobileDisplay="text" onClick={startAnotherSale} className="mt-4 w-full border border-emerald-400/40 text-emerald-100 hover:bg-emerald-500/10">Iniciar otra venta</ResponsiveActionButton>
         </div>}
 
         {!isComplete && submission?.status !== 'error' && <div className="mt-5 max-lg:sticky max-lg:bottom-3 max-lg:z-10 max-lg:-mx-1 max-lg:rounded-2xl max-lg:bg-slate-900/95 max-lg:p-1">
-          {!reviewed ? <ResponsiveActionButton type="submit" label="Review sale" icon="sale" mobileDisplay="text" disabled={isSubmitting || cartProducts.length === 0} className="w-full bg-sky-600 text-white shadow-lg shadow-sky-950/30 hover:bg-sky-500 disabled:opacity-40">Review sale</ResponsiveActionButton> : <ResponsiveActionButton type="button" label={isSubmitting ? 'Recording sale' : 'Submit sale'} icon="sale" mobileDisplay="text" loading={isSubmitting} loadingLabel="Recording sale" disabled={isSubmitting || saleItems.length === 0} onClick={() => void submitSale()} className="w-full bg-sky-600 text-white shadow-lg shadow-sky-950/30 hover:bg-sky-500 disabled:opacity-40">{isSubmitting ? 'Recording sale' : 'Submit sale'}</ResponsiveActionButton>}
+          {!reviewed ? <ResponsiveActionButton type="submit" label="Revisar venta" icon="sale" mobileDisplay="text" disabled={isSubmitting || cartProducts.length === 0} className="w-full bg-sky-600 text-white shadow-lg shadow-sky-950/30 hover:bg-sky-500 disabled:opacity-40">Revisar venta</ResponsiveActionButton> : <ResponsiveActionButton type="button" label={isSubmitting ? 'Registrando venta' : 'Registrar venta'} icon="sale" mobileDisplay="text" loading={isSubmitting} loadingLabel="Registrando venta" disabled={isSubmitting || saleItems.length === 0} onClick={() => void submitSale()} className="w-full bg-sky-600 text-white shadow-lg shadow-sky-950/30 hover:bg-sky-500 disabled:opacity-40">{isSubmitting ? 'Registrando venta' : 'Registrar venta'}</ResponsiveActionButton>}
         </div>}
       </aside>
     </form>

@@ -20,7 +20,7 @@ describe('admin product workspace', () => {
   it('does not load protected products when admin access is denied', async () => {
     vi.mocked(authApi.getAdminAccess).mockResolvedValue(false)
     renderProtected()
-    expect(await screen.findByRole('heading', { name: 'Access unavailable' })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: 'Acceso no disponible' })).toBeInTheDocument()
     expect(productApi.listProducts).not.toHaveBeenCalled()
   })
 
@@ -28,9 +28,9 @@ describe('admin product workspace', () => {
     let resolve!: (products: productApi.Product[]) => void
     vi.mocked(productApi.listProducts).mockReturnValue(new Promise((done) => { resolve = done }))
     renderProtected()
-    expect(await screen.findByText('Loading products…')).toHaveAttribute('role', 'status')
+    expect(await screen.findByText('Cargando productos…')).toHaveAttribute('role', 'status')
     resolve([])
-    expect(await screen.findByText('No products yet. Add the first product to start the shared catalog.')).toBeInTheDocument()
+    expect(await screen.findByText('Aún no hay productos. Agrega el primero para iniciar el catálogo compartido.')).toBeInTheDocument()
   })
 
   it('filters catalog cards by search terms and category', async () => {
@@ -40,35 +40,35 @@ describe('admin product workspace', () => {
 
     expect(await screen.findByRole('heading', { name: 'Mango' })).toBeInTheDocument()
     expect(screen.getByRole('heading', { name: 'Strawberry' })).toBeInTheDocument()
-    expect(screen.getByRole('img', { name: 'Mango product image' })).toBeInTheDocument()
+    expect(screen.getByRole('img', { name: 'Imagen de Mango' })).toBeInTheDocument()
     expect(screen.getAllByText('$42.50 MXN')).toHaveLength(2)
     expect(screen.getAllByText('$35.00 MXN')).toHaveLength(2)
-    expect(screen.getByText('Inactive')).toBeInTheDocument()
+    expect(screen.getByText('Inactivo')).toBeInTheDocument()
 
-    const search = screen.getByRole('searchbox', { name: 'Search products' })
+    const search = screen.getByRole('searchbox', { name: 'Buscar productos' })
     fireEvent.change(search, { target: { value: 'straw' } })
     expect(screen.getByRole('heading', { name: 'Strawberry' })).toBeInTheDocument()
     expect(screen.queryByRole('heading', { name: 'Mango' })).not.toBeInTheDocument()
 
     fireEvent.change(search, { target: { value: '' } })
-    fireEvent.click(screen.getByRole('tab', { name: 'Filter by Ice cream' }))
+    fireEvent.click(screen.getByRole('tab', { name: 'Filtrar por Ice cream' }))
     expect(screen.getByRole('heading', { name: 'Strawberry' })).toBeInTheDocument()
     expect(screen.queryByRole('heading', { name: 'Mango' })).not.toBeInTheDocument()
   })
 
   it('creates a product from the catalog form', async () => {
     vi.mocked(productApi.createProduct).mockResolvedValue(product)
-    renderProtected(); await screen.findByText('No products yet. Add the first product to start the shared catalog.')
-    fireEvent.change(screen.getByLabelText('Name'), { target: { value: 'Mango' } }); fireEvent.change(screen.getByLabelText('SKU / code'), { target: { value: 'M-01' } }); fireEvent.change(screen.getByLabelText('Category'), { target: { value: 'Paletas' } }); fireEvent.change(screen.getByLabelText('Retail price (MXN)'), { target: { value: '42.5' } }); fireEvent.change(screen.getByLabelText('Wholesale price (MXN)'), { target: { value: '35' } })
-    fireEvent.submit(screen.getByRole('form', { name: 'Create product' }))
-    expect(await screen.findByText('Product created.')).toBeInTheDocument(); expect(productApi.createProduct).toHaveBeenCalledWith({ name: 'Mango', sku: 'M-01', category: 'Paletas', retailPriceMxn: 42.5, wholesalePriceMxn: 35, active: true })
+    renderProtected(); await screen.findByText('Aún no hay productos. Agrega el primero para iniciar el catálogo compartido.')
+    fireEvent.change(screen.getByLabelText('Nombre'), { target: { value: 'Mango' } }); fireEvent.change(screen.getByLabelText('SKU / código'), { target: { value: 'M-01' } }); fireEvent.change(screen.getByLabelText('Categoría'), { target: { value: 'Paletas' } }); fireEvent.change(screen.getByLabelText('Precio de menudeo (MXN)'), { target: { value: '42.5' } }); fireEvent.change(screen.getByLabelText('Precio mayorista (MXN)'), { target: { value: '35' } })
+    fireEvent.submit(screen.getByRole('form', { name: 'Crear producto' }))
+    expect(await screen.findByText('Producto creado.')).toBeInTheDocument(); expect(productApi.createProduct).toHaveBeenCalledWith({ name: 'Mango', sku: 'M-01', category: 'Paletas', retailPriceMxn: 42.5, wholesalePriceMxn: 35, active: true })
   })
 
   it('updates and deactivates an existing product', async () => {
     vi.mocked(productApi.listProducts).mockResolvedValue([product]); vi.mocked(productApi.updateProduct).mockResolvedValue({ ...product, name: 'Mango Grande' }); vi.mocked(productApi.deactivateProduct).mockResolvedValue({ ...product, active: false })
     renderProtected(); await screen.findByRole('heading', { name: 'Mango' })
-    fireEvent.click(screen.getByRole('button', { name: 'Edit Mango' })); fireEvent.change(screen.getByLabelText('Name'), { target: { value: 'Mango Grande' } }); fireEvent.submit(screen.getByRole('form', { name: 'Edit Mango' }))
-    expect(await screen.findByText('Product updated.')).toBeInTheDocument(); expect(productApi.updateProduct).toHaveBeenCalledWith('product-1', expect.objectContaining({ name: 'Mango Grande' }))
-    fireEvent.click(screen.getByRole('button', { name: 'Deactivate Mango Grande' })); expect(await screen.findByText('Product deactivated.')).toBeInTheDocument(); expect(productApi.deactivateProduct).toHaveBeenCalledWith('product-1')
+    fireEvent.click(screen.getByRole('button', { name: 'Editar Mango' })); fireEvent.change(screen.getByLabelText('Nombre'), { target: { value: 'Mango Grande' } }); fireEvent.submit(screen.getByRole('form', { name: 'Editar Mango' }))
+    expect(await screen.findByText('Producto actualizado.')).toBeInTheDocument(); expect(productApi.updateProduct).toHaveBeenCalledWith('product-1', expect.objectContaining({ name: 'Mango Grande' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Desactivar Mango Grande' })); expect(await screen.findByText('Producto desactivado.')).toBeInTheDocument(); expect(productApi.deactivateProduct).toHaveBeenCalledWith('product-1')
   })
 })

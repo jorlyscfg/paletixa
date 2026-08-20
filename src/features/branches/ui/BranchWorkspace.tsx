@@ -32,7 +32,7 @@ export function BranchWorkspace() {
         ? await createBranch(action.name, action.requestId)
         : await setBranchStatus(action.branch.id, action.status, action.requestId)
       merge(result); setState('ready')
-      setNotice(action.kind === 'create' ? 'Branch created.' : 'Branch status updated.')
+      setNotice(action.kind === 'create' ? 'Sucursal creada.' : 'Estado de la sucursal actualizado.')
     } catch { setState('ready'); setFailed(action) }
     finally { mutation.current = false; setMutating(false) }
   }
@@ -44,16 +44,16 @@ export function BranchWorkspace() {
   }
 
   return <section aria-labelledby="branches-title" className="w-full max-w-4xl">
-    <div className="flex flex-wrap items-end justify-between gap-4"><div><p className="font-medium text-sky-700">Administration</p><h1 id="branches-title" className="mt-1 text-3xl font-semibold tracking-tight sm:text-4xl">Branches</h1></div><button disabled={mutating} className="min-h-11 rounded-xl border border-slate-300 bg-white px-4 font-medium focus:outline-none focus:ring-2 focus:ring-sky-600 disabled:opacity-60" onClick={load}>Refresh branches</button></div>
-    <form aria-label="Create branch" className="mt-8 flex flex-col gap-3 rounded-2xl bg-white p-4 shadow-sm sm:flex-row sm:items-end" onSubmit={submit}>
-      <label className="grid flex-1 gap-1.5 font-medium">Branch name<input required maxLength={120} name="name" className="min-h-11 rounded-xl border border-slate-300 px-3 focus:outline-none focus:ring-2 focus:ring-sky-600" /></label>
-      <button disabled={mutating} className="min-h-11 rounded-xl bg-slate-950 px-5 font-medium text-white focus:outline-none focus:ring-2 focus:ring-sky-600 focus:ring-offset-2 disabled:opacity-60">Create branch</button>
+    <div className="flex flex-wrap items-end justify-between gap-4"><div><p className="font-medium text-sky-400">Administración</p><h1 id="branches-title" className="mt-1 text-3xl font-semibold tracking-tight text-white sm:text-4xl">Sucursales</h1></div><button type="button" disabled={mutating} className="ops-action ops-focus border border-slate-700 bg-slate-900 px-4 font-medium text-slate-200 hover:bg-slate-800" onClick={load}>Actualizar sucursales</button></div>
+    <form aria-label="Crear sucursal" className="mt-8 flex flex-col gap-3 rounded-2xl border border-slate-800 bg-slate-900 p-4 shadow-xl sm:flex-row sm:items-end" onSubmit={submit}>
+      <label className="grid flex-1 gap-1.5 text-sm font-medium text-slate-200">Nombre de la sucursal<input required maxLength={120} name="name" className="ops-control ops-focus min-h-11 px-3" /></label>
+      <button disabled={mutating} className="ops-action ops-focus min-h-11 bg-sky-600 px-5 font-medium text-white hover:bg-sky-500 disabled:opacity-60">Crear sucursal</button>
     </form>
-    <p aria-live="polite" className="mt-4 text-sm font-medium text-emerald-700">{notice}</p>
-    {failed && <div ref={alert} tabIndex={-1} role="alert" className="mt-4 rounded-xl bg-rose-50 p-4 text-rose-900"><p>{failed.kind === 'create' ? 'The branch was not created.' : 'The branch status was not changed.'}</p><button className="mt-3 min-h-11 rounded-xl bg-rose-900 px-4 font-medium text-white" onClick={() => run(failed)}>Retry {failed.kind === 'create' ? 'create' : 'status change'}</button></div>}
-    {state === 'loading' && <p role="status" className="mt-8 text-slate-700">Loading branches…</p>}
-    {state === 'error' && <div ref={alert} tabIndex={-1} role="alert" className="mt-8 rounded-xl bg-rose-50 p-4 text-rose-900"><p>Branches could not be loaded.</p><button className="mt-3 min-h-11 rounded-xl bg-rose-900 px-4 font-medium text-white" onClick={load}>Try again</button></div>}
-    {state === 'ready' && branches.length === 0 && <p className="mt-8 rounded-2xl bg-white p-6 text-slate-700 shadow-sm">No branches yet.</p>}
-    {state === 'ready' && branches.length > 0 && <ul className="mt-6 divide-y divide-slate-200 rounded-2xl bg-white px-4 shadow-sm">{branches.map((branch) => { const next = branch.status === 'active' ? 'suspended' : 'active'; return <li key={branch.id} className="flex flex-col gap-3 py-4 sm:flex-row sm:items-center sm:justify-between"><div><h2 className="font-semibold">{branch.name}</h2><p className="mt-1 text-sm text-slate-600">{branch.status === 'active' ? 'Active' : 'Suspended'}</p></div><button disabled={mutating} className="min-h-11 rounded-xl border border-slate-300 px-4 font-medium focus:outline-none focus:ring-2 focus:ring-sky-600 disabled:opacity-60" aria-label={`${next === 'active' ? 'Activate' : 'Suspend'} ${branch.name}`} onClick={() => run({ kind: 'status', branch, status: next, requestId: crypto.randomUUID() })}>{next === 'active' ? 'Activate' : 'Suspend'}</button></li> })}</ul>}
+    <p aria-live="polite" className="mt-4 min-h-5 text-sm font-medium text-emerald-300">{notice}</p>
+    {failed && <div ref={alert} tabIndex={-1} role="alert" className="mt-4 rounded-xl border border-rose-500/30 bg-rose-500/10 p-4 text-rose-100"><p>{failed.kind === 'create' ? 'No se pudo crear la sucursal.' : 'No se pudo cambiar el estado de la sucursal.'}</p><button className="ops-action ops-focus mt-3 bg-rose-800 px-4 font-medium text-white hover:bg-rose-700" onClick={() => run(failed)}>Reintentar {failed.kind === 'create' ? 'creación' : 'cambio de estado'}</button></div>}
+    {state === 'loading' && <p role="status" className="mt-8 rounded-2xl border border-slate-800 bg-slate-900 p-6 text-sm text-slate-300">Cargando sucursales…</p>}
+    {state === 'error' && <div ref={alert} tabIndex={-1} role="alert" className="mt-8 rounded-xl border border-rose-500/30 bg-rose-500/10 p-4 text-rose-100"><p>No se pudieron cargar las sucursales.</p><button className="ops-action ops-focus mt-3 bg-rose-800 px-4 font-medium text-white hover:bg-rose-700" onClick={load}>Reintentar</button></div>}
+    {state === 'ready' && branches.length === 0 && <p className="mt-8 rounded-2xl border border-slate-800 bg-slate-900 p-6 text-slate-300 shadow-xl">Aún no hay sucursales.</p>}
+    {state === 'ready' && branches.length > 0 && <ul className="mt-6 divide-y divide-slate-800 rounded-2xl border border-slate-800 bg-slate-900 px-4 shadow-xl">{branches.map((branch) => { const next = branch.status === 'active' ? 'suspended' : 'active'; return <li key={branch.id} className="flex flex-col gap-3 py-4 sm:flex-row sm:items-center sm:justify-between"><div><h2 className="font-semibold text-white">{branch.name}</h2><p className="mt-1 text-sm text-slate-400">{branch.status === 'active' ? 'Activa' : 'Suspendida'}</p></div><button type="button" disabled={mutating} className="ops-action ops-focus border border-slate-700 bg-slate-950 px-4 font-medium text-slate-200 hover:bg-slate-800 disabled:opacity-60" aria-label={`${next === 'active' ? 'Activar' : 'Suspender'} ${branch.name}`} onClick={() => run({ kind: 'status', branch, status: next, requestId: crypto.randomUUID() })}>{next === 'active' ? 'Activar' : 'Suspender'}</button></li> })}</ul>}
   </section>
 }

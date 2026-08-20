@@ -12,8 +12,8 @@ type CustomDatePickerProps = {
   ariaInvalid?: boolean
 }
 
-const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December']
-const WEEKDAYS = ['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa']
+const MONTHS = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre']
+const WEEKDAYS = ['do', 'lu', 'ma', 'mi', 'ju', 'vi', 'sá']
 
 function parseDate(value: string) {
   const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value)
@@ -36,7 +36,7 @@ function cellsFor(date: Date) {
   })
 }
 
-export function CustomDatePicker({ value, onChange, className = '', placeholder = 'Select a date', disabled = false, align = 'left', ariaLabel, ariaInvalid = false }: CustomDatePickerProps) {
+export function CustomDatePicker({ value, onChange, className = '', placeholder = 'Selecciona una fecha', disabled = false, align = 'left', ariaLabel, ariaInvalid = false }: CustomDatePickerProps) {
   const selected = useMemo(() => parseDate(value), [value])
   const [open, setOpen] = useState(false)
   const [navDate, setNavDate] = useState(() => selected ?? new Date())
@@ -58,7 +58,7 @@ export function CustomDatePicker({ value, onChange, className = '', placeholder 
   }, [open])
 
   const cells = cellsFor(navDate)
-  const label = selected ? selected.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : placeholder
+  const label = selected ? selected.toLocaleDateString('es-MX', { month: 'short', day: 'numeric', year: 'numeric' }) : placeholder
 
   function moveMonth(amount: number) { setNavDate(new Date(navDate.getFullYear(), navDate.getMonth() + amount, 1)) }
 
@@ -66,14 +66,14 @@ export function CustomDatePicker({ value, onChange, className = '', placeholder 
     <button type="button" disabled={disabled} aria-label={ariaLabel ? `${ariaLabel}: ${label}` : label} aria-invalid={ariaInvalid || undefined} aria-haspopup="dialog" aria-expanded={open} onClick={() => setOpen((current) => !current)} className={`ops-control ops-focus flex min-h-11 w-full items-center justify-between gap-3 px-3.5 text-left ${className}`}>
       <span className="flex min-w-0 items-center gap-2 truncate"><Icon name="calendar" className="h-4 w-4 shrink-0 text-slate-500" />{label}</span><Icon name="chevron-down" className={`h-4 w-4 shrink-0 text-slate-500 transition-transform ${open ? 'rotate-180' : ''}`} />
     </button>
-    {open && <div role="dialog" aria-label="Calendar" className={`ops-popover absolute top-full z-50 mt-2 w-[23rem] max-w-[calc(100vw-2rem)] overflow-x-auto p-4 ${align === 'right' ? 'right-0' : 'left-0'}`}>
+    {open && <div role="dialog" aria-label="Calendario" className={`ops-popover absolute top-full z-50 mt-2 w-[23rem] max-w-[calc(100vw-2rem)] overflow-x-auto p-4 ${align === 'right' ? 'right-0' : 'left-0'}`}>
       <div className="flex items-center justify-between gap-2">
-        <button type="button" aria-label="Previous month" onClick={() => moveMonth(-1)} className="ops-focus inline-flex h-11 w-11 items-center justify-center rounded-lg text-slate-300 hover:bg-slate-800"><Icon name="chevron-left" className="h-4 w-4" /></button>
+        <button type="button" aria-label="Mes anterior" onClick={() => moveMonth(-1)} className="ops-focus inline-flex h-11 w-11 items-center justify-center rounded-lg text-slate-300 hover:bg-slate-800"><Icon name="chevron-left" className="h-4 w-4" /></button>
         <p className="text-sm font-semibold text-white">{MONTHS[navDate.getMonth()]} {navDate.getFullYear()}</p>
-        <button type="button" aria-label="Next month" onClick={() => moveMonth(1)} className="ops-focus inline-flex h-11 w-11 items-center justify-center rounded-lg text-slate-300 hover:bg-slate-800"><Icon name="chevron-right" className="h-4 w-4" /></button>
+        <button type="button" aria-label="Mes siguiente" onClick={() => moveMonth(1)} className="ops-focus inline-flex h-11 w-11 items-center justify-center rounded-lg text-slate-300 hover:bg-slate-800"><Icon name="chevron-right" className="h-4 w-4" /></button>
       </div>
       <div className="mt-3 grid grid-cols-7 gap-1 text-center">{WEEKDAYS.map((day) => <span key={day} className="py-1 text-xs font-medium text-slate-500">{day}</span>)}
-        {cells.map(({ date, current }) => { const isSelected = selected && toValue(selected) === toValue(date); return <button key={toValue(date)} type="button" aria-label={date.toLocaleDateString('en-US', { dateStyle: 'long' })} onClick={() => { onChange(toValue(date)); setOpen(false) }} className={`ops-focus inline-flex h-11 w-11 items-center justify-center rounded-lg text-sm text-white ${isSelected ? 'bg-sky-700 font-semibold' : current ? 'hover:bg-slate-800' : 'opacity-50 hover:bg-slate-800/60'}`}><span>{date.getDate()}</span></button> })}
+        {cells.map(({ date, current }) => { const isSelected = selected && toValue(selected) === toValue(date); return <button key={toValue(date)} type="button" aria-label={date.toLocaleDateString('es-MX', { dateStyle: 'long' })} onClick={() => { onChange(toValue(date)); setOpen(false) }} className={`ops-focus inline-flex h-11 w-11 items-center justify-center rounded-lg text-sm text-white ${isSelected ? 'bg-sky-700 font-semibold' : current ? 'hover:bg-slate-800' : 'opacity-50 hover:bg-slate-800/60'}`}><span>{date.getDate()}</span></button> })}
       </div>
     </div>}
   </div>

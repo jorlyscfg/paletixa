@@ -8,7 +8,7 @@ type CatalogImageTileProps = HTMLAttributes<HTMLDivElement> & { src?: string | n
 export function CatalogImageTile({ src, alt, fallback = CATALOG_IMAGE_TILE_DEFAULT_FALLBACK, imageClassName = '', className = '', children, ...props }: CatalogImageTileProps) {
   const [failed, setFailed] = useState(false)
   const showImage = Boolean(src) && !failed
-  return <div {...props} className={`relative flex aspect-square items-center justify-center overflow-hidden rounded-xl border border-slate-200 bg-slate-100 text-slate-500 ${className}`}>
+  return <div {...props} className={`relative flex aspect-square items-center justify-center overflow-hidden rounded-xl border border-slate-800 bg-slate-950 text-slate-400 ${className}`}>
     {showImage ? <img src={src ?? undefined} alt={alt} className={`h-full w-full object-cover ${imageClassName}`} onError={() => setFailed(true)} /> : <div role="img" aria-label={alt} className="flex items-center justify-center">{fallback}</div>}
     {children ? <div className="absolute inset-0">{children}</div> : null}
   </div>
