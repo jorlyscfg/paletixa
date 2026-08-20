@@ -13,6 +13,7 @@ const fixture = {
   password: `${randomBytes(32).toString('base64url')}aA1!`,
   retailProductId: crypto.randomUUID(),
   inactiveProductId: crypto.randomUUID(),
+  categoryId: crypto.randomUUID(),
 }
 let client: InsForgeClient
 let baseUrl: string
@@ -65,9 +66,10 @@ beforeAll(async () => {
   await query(`insert into auth.users(id,email,password,email_verified) values ('${fixture.userId}','${fixture.email}',crypt('${fixture.password}',gen_salt('bf')),true);
     insert into public.profiles(user_id,is_active) values ('${fixture.userId}',true);
     insert into public.user_roles select '${fixture.userId}',id from public.roles where key='admin';
-    insert into public.products(id,name,sku,category,retail_price_mxn,wholesale_price_mxn,active) values
-      ('${fixture.retailProductId}','Ledger Mango','LEDGER-MANGO-${fixture.retailProductId.slice(0,8)}','Test',10.50,7.25,true),
-      ('${fixture.inactiveProductId}','Inactive Ledger Product','LEDGER-INACTIVE-${fixture.inactiveProductId.slice(0,8)}','Test',12.00,8.00,false)`)
+    insert into public.product_categories(id,name) values ('${fixture.categoryId}','Test');
+    insert into public.products(id,name,sku,category_id,retail_price_mxn,wholesale_price_mxn,active) values
+      ('${fixture.retailProductId}','Ledger Mango','LEDGER-MANGO-${fixture.retailProductId.slice(0,8)}','${fixture.categoryId}',10.50,7.25,true),
+      ('${fixture.inactiveProductId}','Inactive Ledger Product','LEDGER-INACTIVE-${fixture.inactiveProductId.slice(0,8)}','${fixture.categoryId}',12.00,8.00,false)`)
   const auth = createClient({ baseUrl })
   const session = await data(auth.auth.signInWithPassword({ email: fixture.email, password: fixture.password }))
   client = createClient({ baseUrl, accessToken: session!.accessToken! })
@@ -83,6 +85,7 @@ afterAll(async () => {
   await assertValidationBranch()
   await query(`delete from public.sales where created_by='${fixture.userId}';
     delete from public.products where id in ('${fixture.retailProductId}','${fixture.inactiveProductId}');
+    delete from public.product_categories where id='${fixture.categoryId}';
     delete from auth.users where id='${fixture.userId}'`)
   expect(await query(`select
     (select count(*)::int from auth.users where id='${fixture.userId}') users,

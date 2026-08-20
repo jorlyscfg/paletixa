@@ -2,6 +2,7 @@ import { type ChangeEvent, type FormEvent, useCallback, useEffect, useId, useRef
 import { CatalogImageTile } from '../../../app/components/CatalogImageTile'
 import { ResponsiveActionButton } from '../../../app/components/ResponsiveActionButton'
 import { SearchInput } from '../../../app/components/SearchInput'
+import { listProductCategories, type ProductCategory } from '../api/productCategories'
 import {
   createProduct,
   deactivateProduct,
@@ -17,11 +18,12 @@ import {
   type CreateProductInput,
   type Product,
 } from '../api/products'
+import { ProductCategoryManagerModal } from './ProductCategoryManagerModal'
 
 type Draft = CreateProductInput & { active: boolean; imageFile: File | null; removeImage: boolean }
 
 const ALL_CATEGORIES = 'Todas las categorías'
-const emptyDraft: Draft = { name: '', sku: '', category: '', retailPriceMxn: 0, wholesalePriceMxn: 0, tags: [], active: true, imageFile: null, removeImage: false }
+const emptyDraft: Draft = { name: '', sku: '', categoryId: '', retailPriceMxn: 0, wholesalePriceMxn: 0, tags: [], active: true, imageFile: null, removeImage: false }
 
 function formatPrice(value: number) {
   return `$${value.toFixed(2)} MXN`
@@ -45,23 +47,38 @@ function validateImageFile(file: File) {
   return ''
 }
 
+function normalizeCategoryFilter(value: string) {
+  return value.toLocaleLowerCase().replace(/\s+/g, '')
+}
+
 function ProductForm({
   product,
+  categories,
+  categorySelection,
   tagSuggestions,
   busy,
   onCancel,
+  onManageCategories,
   onSubmit,
 }: {
   product: Product | null
+  categories: ProductCategory[]
+  categorySelection: ProductCategory | null
   tagSuggestions: string[]
   busy: boolean
   onCancel: () => void
+  onManageCategories: () => void
   onSubmit: (draft: Draft) => void
 }) {
   const initial = product
-    ? { name: product.name, sku: product.sku, category: product.category, retailPriceMxn: product.retailPriceMxn, wholesalePriceMxn: product.wholesalePriceMxn, tags: product.tags, active: product.active }
+    ? { name: product.name, sku: product.sku, category: product.category, categoryId: product.categoryId, retailPriceMxn: product.retailPriceMxn, wholesalePriceMxn: product.wholesalePriceMxn, tags: product.tags, active: product.active }
     : emptyDraft
   const [tags, setTags] = useState<string[]>(initial.tags ?? [])
+  const [categoryInput, setCategoryInput] = useState(product?.category ?? '')
+  const [categoryId, setCategoryId] = useState(initial.categoryId)
+  const [categoryError, setCategoryError] = useState('')
+  const [categoryOpen, setCategoryOpen] = useState(false)
+  const [activeCategoryIndex, setActiveCategoryIndex] = useState(0)
   const [tagInput, setTagInput] = useState('')
   const [tagError, setTagError] = useState('')
   const [selectedImage, setSelectedImage] = useState<File | null>(null)
@@ -73,6 +90,16 @@ function ProductForm({
   useEffect(() => () => {
     if (imagePreviewRef.current) URL.revokeObjectURL(imagePreviewRef.current)
   }, [])
+
+  useEffect(() => {
+    if (!categorySelection) return
+    queueMicrotask(() => {
+      setCategoryInput(categorySelection.name)
+      setCategoryId(categorySelection.id)
+      setCategoryError('')
+      setCategoryOpen(false)
+    })
+  }, [categorySelection])
 
   const displayedImageUrl = imagePreviewUrl ?? (removeImage ? null : product?.imageUrl ?? null)
 
@@ -128,11 +155,15 @@ function ProductForm({
       setTagError('Agrega la etiqueta escrita o borra el texto antes de guardar.')
       return
     }
+    if (!categoryId || !categories.some(({ id }) => id === categoryId)) {
+      setCategoryError('Selecciona una categoría existente de la lista antes de guardar.')
+      return
+    }
     const values = new FormData(event.currentTarget)
     onSubmit({
       name: String(values.get('name') ?? ''),
       sku: String(values.get('sku') ?? ''),
-      category: String(values.get('category') ?? ''),
+      categoryId,
       retailPriceMxn: Number(values.get('retailPriceMxn')),
       wholesalePriceMxn: Number(values.get('wholesalePriceMxn')),
       tags,
@@ -144,12 +175,43 @@ function ProductForm({
 
   const inputClassName = 'ops-control ops-focus min-h-11 w-full px-3 text-sm font-medium placeholder:text-slate-500'
   const imageActionClassName = 'inline-flex min-h-11 items-center justify-center rounded-xl border border-slate-700 bg-slate-900 px-3 text-sm font-bold text-slate-200 transition-colors hover:border-sky-500 hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400 disabled:pointer-events-none disabled:opacity-50'
+  const categoryMatches = categories.filter(({ name }) => normalizeCategoryFilter(name).includes(normalizeCategoryFilter(categoryInput)))
+  const categoryListId = 'product-category-options'
 
   return <form key={product?.id ?? 'new'} aria-label={product ? `Editar ${product.name}` : 'Crear producto'} className="grid gap-5 rounded-3xl border border-slate-800 bg-slate-950 p-4 shadow-xl sm:p-6" onSubmit={submit}>
     <div className="grid gap-4 sm:grid-cols-2">
       <label className="grid gap-2 text-sm font-semibold text-slate-300">Nombre<input required maxLength={160} name="name" defaultValue={initial.name} className={inputClassName} /></label>
       <label className="grid gap-2 text-sm font-semibold text-slate-300">SKU / código<input required maxLength={80} name="sku" defaultValue={initial.sku} className={inputClassName} /></label>
-      <label className="grid gap-2 text-sm font-semibold text-slate-300">Categoría<input required maxLength={120} name="category" defaultValue={initial.category} className={inputClassName} /></label>
+      <div className="relative grid gap-2 text-sm font-semibold text-slate-300">
+        <label htmlFor="product-category">Categoría</label>
+        <div className="relative">
+          <input id="product-category" required maxLength={120} name="category" value={categoryInput} autoComplete="off" role="combobox" aria-autocomplete="list" aria-controls={categoryListId} aria-expanded={categoryOpen} aria-activedescendant={categoryOpen && categoryMatches[activeCategoryIndex] ? `product-category-option-${categoryMatches[activeCategoryIndex].id}` : undefined} aria-describedby="product-category-help product-category-error" className={`${inputClassName} pr-14`} onFocus={() => setCategoryOpen(true)} onChange={(event) => { setCategoryInput(event.target.value); setCategoryId(''); setCategoryError(''); setActiveCategoryIndex(0); setCategoryOpen(true) }} onKeyDown={(event) => {
+            if (event.key === 'ArrowDown') {
+              event.preventDefault()
+              setCategoryOpen(true)
+              setActiveCategoryIndex((current) => categoryMatches.length === 0 ? 0 : (current + 1) % categoryMatches.length)
+            } else if (event.key === 'ArrowUp') {
+              event.preventDefault()
+              setCategoryOpen(true)
+              setActiveCategoryIndex((current) => categoryMatches.length === 0 ? 0 : (current - 1 + categoryMatches.length) % categoryMatches.length)
+            } else if (event.key === 'Enter' && categoryOpen && categoryMatches[activeCategoryIndex]) {
+              event.preventDefault()
+              setCategoryInput(categoryMatches[activeCategoryIndex].name)
+              setCategoryId(categoryMatches[activeCategoryIndex].id)
+              setCategoryError('')
+              setCategoryOpen(false)
+            } else if (event.key === 'Escape') {
+              setCategoryOpen(false)
+            }
+          }} />
+          <button type="button" aria-label="Administrar categorías" title="Administrar categorías" disabled={busy} className="ops-focus absolute right-1 top-1/2 inline-flex min-h-11 min-w-11 -translate-y-1/2 items-center justify-center rounded-lg border border-slate-700 bg-slate-900 text-lg font-bold text-slate-200 hover:border-sky-500 hover:bg-slate-800 disabled:pointer-events-none disabled:opacity-50" onClick={onManageCategories}>+</button>
+          {categoryOpen && <ul id={categoryListId} role="listbox" aria-label="Categorías disponibles" className="absolute left-0 right-0 top-full z-30 mt-1 max-h-48 overflow-y-auto rounded-xl border border-slate-700 bg-slate-900 p-1 shadow-2xl">
+            {categoryMatches.length > 0 ? categoryMatches.map((category, index) => <li id={`product-category-option-${category.id}`} key={category.id} role="option" aria-selected={category.id === categoryId} className={`cursor-pointer rounded-lg px-3 py-2 text-sm font-semibold ${index === activeCategoryIndex ? 'bg-sky-500/15 text-white' : 'text-white/80 hover:bg-slate-800 hover:text-white'}`} onMouseDown={(event) => event.preventDefault()} onClick={() => { setCategoryInput(category.name); setCategoryId(category.id); setCategoryError(''); setCategoryOpen(false) }}>{category.name}</li>) : <li className="px-3 py-2 text-sm font-normal text-white/60">No hay categorías que coincidan.</li>}
+          </ul>}
+        </div>
+        <p id="product-category-help" className="text-xs font-normal leading-relaxed text-slate-500">Escribe para filtrar y selecciona una categoría existente.</p>
+        {categoryError && <p id="product-category-error" role="alert" className="text-xs font-semibold text-rose-300">{categoryError}</p>}
+      </div>
       <label className="grid gap-2 text-sm font-semibold text-slate-300">Precio de menudeo (MXN)<input required min="0" step="0.01" name="retailPriceMxn" type="number" defaultValue={initial.retailPriceMxn} className={inputClassName} /></label>
       <label className="grid gap-2 text-sm font-semibold text-slate-300">Precio mayorista (MXN)<input required min="0" step="0.01" name="wholesalePriceMxn" type="number" defaultValue={initial.wholesalePriceMxn} className={inputClassName} /></label>
       <div className="grid gap-2 sm:col-span-2">
@@ -199,19 +261,25 @@ function ProductForm({
 
 function ProductModal({
   product,
+  categories,
+  categorySelection,
   tagSuggestions,
   busy,
   error,
   errorRef,
   onClose,
+  onManageCategories,
   onSubmit,
 }: {
   product: Product | null
+  categories: ProductCategory[]
+  categorySelection: ProductCategory | null
   tagSuggestions: string[]
   busy: boolean
   error: string
   errorRef: React.RefObject<HTMLDivElement | null>
   onClose: () => void
+  onManageCategories: () => void
   onSubmit: (draft: Draft) => void
 }) {
   const dialogRef = useRef<HTMLDivElement>(null)
@@ -234,6 +302,7 @@ function ProductModal({
     closeButtonRef.current?.focus()
 
     function handleKeyDown(event: KeyboardEvent) {
+      if (event.target !== document && event.target instanceof Node && !dialogRef.current?.contains(event.target)) return
       if (event.key === 'Escape') {
         event.preventDefault()
         requestClose()
@@ -271,7 +340,7 @@ function ProductModal({
       </div>
       <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
         {error && <div ref={errorRef} tabIndex={-1} role="alert" className="mx-4 mt-4 rounded-2xl border border-rose-500/20 bg-rose-500/10 p-4 text-sm font-semibold text-rose-300 sm:mx-6">{error}</div>}
-        <div className="p-4 sm:p-6"><ProductForm product={product} tagSuggestions={tagSuggestions} busy={busy} onCancel={requestClose} onSubmit={onSubmit} /></div>
+        <div className="p-4 sm:p-6"><ProductForm product={product} categories={categories} categorySelection={categorySelection} tagSuggestions={tagSuggestions} busy={busy} onCancel={requestClose} onManageCategories={onManageCategories} onSubmit={onSubmit} /></div>
       </div>
     </div>
   </div>
@@ -279,9 +348,12 @@ function ProductModal({
 
 export function ProductWorkspace() {
   const [products, setProducts] = useState<Product[]>([])
+  const [productCategories, setProductCategories] = useState<ProductCategory[]>([])
   const [state, setState] = useState<'loading' | 'ready' | 'error'>('loading')
   const [editing, setEditing] = useState<Product | null>(null)
   const [formOpen, setFormOpen] = useState(false)
+  const [categoryManagerOpen, setCategoryManagerOpen] = useState(false)
+  const [categorySelection, setCategorySelection] = useState<ProductCategory | null>(null)
   const [searchQuery, setSearchQuery] = useState('')
   const [selectedCategory, setSelectedCategory] = useState(ALL_CATEGORIES)
   const [notice, setNotice] = useState('')
@@ -294,9 +366,10 @@ export function ProductWorkspace() {
     const current = ++sequence.current
     setState('loading')
     try {
-      const next = await listProducts()
+      const [nextProducts, nextCategories] = await Promise.all([listProducts(), listProductCategories()])
       if (current === sequence.current) {
-        setProducts(next)
+        setProducts(nextProducts)
+        setProductCategories(nextCategories)
         setState('ready')
       }
     } catch {
@@ -316,6 +389,7 @@ export function ProductWorkspace() {
     setError('')
     setNotice('')
     setEditing(null)
+    setCategorySelection(null)
     setFormOpen(true)
   }
 
@@ -323,7 +397,21 @@ export function ProductWorkspace() {
     setError('')
     setNotice('')
     setEditing(product)
+    setCategorySelection(null)
     setFormOpen(true)
+  }
+
+  function openCategoryManager() {
+    setError('')
+    setCategoryManagerOpen(true)
+  }
+
+  async function handleCategoryChanged(category: ProductCategory | null, mutation: 'created' | 'updated' | 'deleted') {
+    if (category && mutation !== 'deleted') {
+      setProductCategories((current) => [...current.filter(({ id }) => id !== category.id), category].sort((a, b) => a.name.localeCompare(b.name)))
+    }
+    await load()
+    if (category && mutation !== 'deleted') setCategorySelection(category)
   }
 
   function merge(product: Product) {
@@ -342,7 +430,7 @@ export function ProductWorkspace() {
     const productInput: CreateProductInput = {
       name: draft.name,
       sku: draft.sku,
-      category: draft.category,
+      categoryId: draft.categoryId,
       retailPriceMxn: draft.retailPriceMxn,
       wholesalePriceMxn: draft.wholesalePriceMxn,
       tags: draft.tags,
@@ -403,7 +491,8 @@ export function ProductWorkspace() {
   const tagSuggestions = Array.from(new Set(products.flatMap(({ tags }) => tags))).sort((a, b) => a.localeCompare(b))
   const filteredProducts = products.filter((product) => matchesProduct(product, searchQuery, selectedCategory))
 
-  return <section aria-labelledby="products-title" className="w-full rounded-3xl bg-slate-900 p-4 text-slate-100 shadow-2xl sm:p-6 lg:p-8">
+  return <>
+    <section aria-labelledby="products-title" className="w-full rounded-3xl bg-slate-900 p-4 text-slate-100 shadow-2xl sm:p-6 lg:p-8">
     <header className="flex flex-col gap-4 border-b border-slate-800 pb-5 sm:flex-row sm:items-center sm:justify-between">
       <h1 id="products-title" className="text-3xl font-black tracking-tight text-white sm:text-4xl">Productos</h1>
       <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:items-center">
@@ -458,6 +547,8 @@ export function ProductWorkspace() {
         </li>)}
       </ul>}
     </div>}
-    {formOpen && <ProductModal product={editing} tagSuggestions={tagSuggestions} busy={busy} error={error} errorRef={alert} onClose={closeForm} onSubmit={save} />}
-  </section>
+    {formOpen && <ProductModal product={editing} categories={productCategories} categorySelection={categorySelection} tagSuggestions={tagSuggestions} busy={busy} error={error} errorRef={alert} onClose={closeForm} onManageCategories={openCategoryManager} onSubmit={save} />}
+    </section>
+    {categoryManagerOpen && <ProductCategoryManagerModal categories={productCategories} onClose={() => setCategoryManagerOpen(false)} onChanged={handleCategoryChanged} />}
+  </>
 }

@@ -1,6 +1,6 @@
 import { insforge } from '../../../lib/insforge'
 
-const PRODUCT_COLUMNS = 'id, name, sku, category, retail_price_mxn, wholesale_price_mxn, active, tags, image_url, image_key, created_at, updated_at'
+const PRODUCT_COLUMNS = 'id, name, sku, category_id, category:product_categories(id, name), retail_price_mxn, wholesale_price_mxn, active, tags, image_url, image_key, created_at, updated_at'
 
 export const PRODUCT_IMAGE_BUCKET = 'product-images'
 export const PRODUCT_IMAGE_MAX_BYTES = 5 * 1024 * 1024
@@ -13,6 +13,7 @@ export type Product = {
   name: string
   sku: string
   category: string
+  categoryId: string
   retailPriceMxn: number
   wholesalePriceMxn: number
   active: boolean
@@ -26,7 +27,7 @@ export type Product = {
 export type CreateProductInput = {
   name: string
   sku: string
-  category: string
+  categoryId: string
   retailPriceMxn: number
   wholesalePriceMxn: number
   tags?: string[]
@@ -51,7 +52,8 @@ type ProductRow = {
   id: string
   name: string
   sku: string
-  category: string
+  category_id: string
+  category: { id: string; name: string } | null
   retail_price_mxn: number | string
   wholesale_price_mxn: number | string
   active: boolean
@@ -97,7 +99,7 @@ function normalizeCreate(input: CreateProductInput) {
   return {
     name: text(input.name, 'Product name'),
     sku: text(input.sku, 'SKU'),
-    category: text(input.category, 'Category'),
+    categoryId: text(input.categoryId, 'Category ID'),
     retailPriceMxn: price(input.retailPriceMxn, 'Retail price'),
     wholesalePriceMxn: price(input.wholesalePriceMxn, 'Wholesale price'),
     tags: normalizeProductTags(input.tags),
@@ -109,7 +111,7 @@ function normalizeUpdate(input: UpdateProductInput) {
   const result: Record<string, string | number | boolean | string[] | null> = {}
   if (input.name !== undefined) result.name = text(input.name, 'Product name')
   if (input.sku !== undefined) result.sku = text(input.sku, 'SKU')
-  if (input.category !== undefined) result.category = text(input.category, 'Category')
+  if (input.categoryId !== undefined) result.category_id = text(input.categoryId, 'Category ID')
   if (input.retailPriceMxn !== undefined) result.retail_price_mxn = price(input.retailPriceMxn, 'Retail price')
   if (input.wholesalePriceMxn !== undefined) result.wholesale_price_mxn = price(input.wholesalePriceMxn, 'Wholesale price')
   if (input.tags !== undefined) result.tags = normalizeProductTags(input.tags)
@@ -124,11 +126,14 @@ function normalizeUpdate(input: UpdateProductInput) {
 function mapProduct(data: unknown): Product {
   const row = (Array.isArray(data) ? data[0] : data) as ProductRow | undefined
   if (!row) throw new Error('Product response was empty')
+  const category = Array.isArray(row.category) ? row.category[0] : row.category
+  if (!row.category_id || !category?.id || !category.name) throw new Error('Product response is missing its category relation')
   return {
     id: row.id,
     name: row.name,
     sku: row.sku,
-    category: row.category,
+    category: category.name,
+    categoryId: row.category_id,
     retailPriceMxn: Number(row.retail_price_mxn),
     wholesalePriceMxn: Number(row.wholesale_price_mxn),
     active: row.active,
@@ -151,7 +156,7 @@ export async function createProduct(input: CreateProductInput): Promise<Product>
   const { data, error } = await insforge.database.from('products').insert([{
     name: normalized.name,
     sku: normalized.sku,
-    category: normalized.category,
+    category_id: normalized.categoryId,
     retail_price_mxn: normalized.retailPriceMxn,
     wholesale_price_mxn: normalized.wholesalePriceMxn,
     active: normalized.active,

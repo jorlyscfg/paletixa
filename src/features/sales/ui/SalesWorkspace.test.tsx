@@ -17,8 +17,8 @@ vi.mock('../api/sales', () => ({
 }))
 
 const products: productApi.Product[] = [
-  { id: 'product-1', name: 'Mango', sku: 'M-01', category: 'Paletas', retailPriceMxn: 42.5, wholesalePriceMxn: 35, active: true, tags: ['fruta'], imageUrl: 'https://cdn.example.com/mango.jpg', imageKey: null, createdAt: '2026-08-20T00:00:00Z', updatedAt: '2026-08-20T00:00:00Z' },
-  { id: 'product-2', name: 'Strawberry', sku: 'S-02', category: 'Creams', retailPriceMxn: 28, wholesalePriceMxn: 22, active: true, tags: [], imageUrl: null, imageKey: null, createdAt: '2026-08-20T00:00:00Z', updatedAt: '2026-08-20T00:00:00Z' },
+  { id: 'product-1', name: 'Mango', sku: 'M-01', category: 'Paletas', categoryId: 'category-1', retailPriceMxn: 42.5, wholesalePriceMxn: 35, active: true, tags: ['fruta'], imageUrl: 'https://cdn.example.com/mango.jpg', imageKey: null, createdAt: '2026-08-20T00:00:00Z', updatedAt: '2026-08-20T00:00:00Z' },
+  { id: 'product-2', name: 'Strawberry', sku: 'S-02', category: 'Creams', categoryId: 'category-2', retailPriceMxn: 28, wholesalePriceMxn: 22, active: true, tags: [], imageUrl: null, imageKey: null, createdAt: '2026-08-20T00:00:00Z', updatedAt: '2026-08-20T00:00:00Z' },
 ]
 const receipt: salesApi.SaleReceipt = { id: 'sale-1', channel: 'pos', totalMxn: 85, createdAt: '2026-08-20T00:00:00Z', replayed: false }
 const renderProtected = (channel: salesApi.SalesChannel = 'pos') => render(<AdminBoundary><SalesWorkspace channel={channel} /></AdminBoundary>)
