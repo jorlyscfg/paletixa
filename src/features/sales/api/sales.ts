@@ -66,6 +66,17 @@ export type SalesChannelTotal = {
   totalMxn: number
 }
 
+export type SalesReportDetail = {
+  saleId: string
+  saleDate: string
+  channel: SalesChannel
+  totalMxn: number
+  productName: string
+  quantity: number
+  lineTotalMxn: number
+  contextLabel: string | null
+}
+
 export type SalesReportRange = {
   from: string
   to: string
@@ -83,6 +94,17 @@ type SalesChannelTotalRow = {
   channel: SalesChannel
   sale_count: number | string
   total_mxn: number | string
+}
+
+type SalesReportDetailRow = {
+  sale_id: string
+  sale_date: string
+  channel: SalesChannel
+  total_mxn: number | string
+  product_name: string
+  quantity: number | string
+  line_total_mxn: number | string
+  context_label: string | null
 }
 
 function text(value: unknown, field: string) {
@@ -222,5 +244,25 @@ export async function getSalesByChannel(range: SalesReportRange): Promise<SalesC
     channel: row.channel,
     saleCount: Number(row.sale_count),
     totalMxn: Number(row.total_mxn),
+  }))
+}
+
+export async function getSalesReportDetail(range: SalesReportRange): Promise<SalesReportDetail[]> {
+  const normalized = normalizeRange(range)
+  const { data, error } = await insforge.database.rpc('report_sales_detail', {
+    p_from: normalized.from,
+    p_to: normalized.to,
+    p_limit: 100,
+  })
+  if (error) throw error
+  return ((data ?? []) as SalesReportDetailRow[]).map((row) => ({
+    saleId: row.sale_id,
+    saleDate: row.sale_date,
+    channel: row.channel,
+    totalMxn: Number(row.total_mxn),
+    productName: row.product_name,
+    quantity: Number(row.quantity),
+    lineTotalMxn: Number(row.line_total_mxn),
+    contextLabel: row.context_label ?? null,
   }))
 }

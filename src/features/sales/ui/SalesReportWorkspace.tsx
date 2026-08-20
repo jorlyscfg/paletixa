@@ -2,7 +2,8 @@ import { type FormEvent, useCallback, useEffect, useRef, useState } from 'react'
 import { CustomDatePicker } from '../../../app/components/CustomDatePicker'
 import { InfoButton } from '../../../app/components/InfoButton'
 import { ResponsiveActionButton } from '../../../app/components/ResponsiveActionButton'
-import { getSalesByChannel, SALES_CHANNELS, type SalesChannel, type SalesChannelTotal, type SalesReportRange } from '../api/sales'
+import { getSalesByChannel, getSalesReportDetail, SALES_CHANNELS, type SalesChannel, type SalesChannelTotal, type SalesReportDetail, type SalesReportRange } from '../api/sales'
+import { rankSalesProducts } from './salesReportUtils'
 
 type DateFields = { from: string; to: string }
 type LoadState = 'idle' | 'loading' | 'ready' | 'error'
@@ -61,10 +62,19 @@ function formatMxn(value: number) {
   return `$${value.toFixed(2)} MXN`
 }
 
+function formatSaleDate(value: string) {
+  return new Intl.DateTimeFormat('es-MX', { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(value))
+}
+
+function detailKey(row: SalesReportDetail, index: number) {
+  return `${row.saleId}-${row.productName}-${index}`
+}
+
 export function SalesReportWorkspace() {
   const [dates, setDates] = useState<DateFields>(DEFAULT_DATE_RANGE)
   const [loadState, setLoadState] = useState<LoadState>('loading')
   const [totals, setTotals] = useState<SalesChannelTotal[]>([])
+  const [details, setDetails] = useState<SalesReportDetail[]>([])
   const [validationError, setValidationError] = useState('')
   const [loadError, setLoadError] = useState('')
   const [scopeInfoOpen, setScopeInfoOpen] = useState(false)
@@ -78,10 +88,12 @@ export function SalesReportWorkspace() {
     setLoadState('loading')
     setLoadError('')
     setTotals([])
+    setDetails([])
     try {
-      const next = await getSalesByChannel(range)
+      const [nextTotals, nextDetails] = await Promise.all([getSalesByChannel(range), getSalesReportDetail(range)])
       if (current === sequence.current) {
-        setTotals(normalizeTotals(next))
+        setTotals(normalizeTotals(nextTotals))
+        setDetails(nextDetails)
         setLoadState('ready')
       }
     } catch {
@@ -118,18 +130,20 @@ export function SalesReportWorkspace() {
   const combinedMxn = totals.reduce((sum, row) => sum + row.totalMxn, 0)
   const maxChannelMxn = Math.max(...totals.map((row) => row.totalMxn), 0)
   const progressMax = Math.max(maxChannelMxn, 1)
+  const averageSaleMxn = totalSales === 0 ? 0 : combinedMxn / totalSales
+  const topProducts = rankSalesProducts(details)
 
   return <section aria-labelledby="sales-report-title" className="w-full rounded-3xl bg-slate-900 p-4 text-slate-100 shadow-2xl sm:p-6 lg:p-8">
     <header className="flex flex-col gap-5 border-b border-slate-800 pb-6 sm:flex-row sm:items-start sm:justify-between">
       <div className="min-w-0">
         <div className="flex items-center gap-1.5">
-          <p className="text-[10px] font-black uppercase tracking-[0.18em] text-sky-400">Reportes / visibilidad de ventas</p>
+          <p className="text-[10px] font-black uppercase tracking-[0.18em] text-sky-400">Reportes / análisis de ventas</p>
           <InfoButton id="sales-report-scope-info" label="Explicar el alcance del reporte de ventas" open={scopeInfoOpen} onToggle={() => setScopeInfoOpen((current) => !current)}>
-            Este reporte del MVP solo incluye la cantidad de ventas y los totales en MXN devueltos para Punto de venta, Mayoristas y Eventos en el rango seleccionado. No incluye inventario, compras, sucursales, turnos, auditoría, impuestos, exportación, tendencias ni detalle de transacciones.
+            Este reporte del MVP solo incluye ventas registradas en Punto de venta, Mayoristas y Eventos. El detalle está limitado a las 100 ventas más recientes del rango y no incluye inventario, compras, sucursales, turnos, impuestos ni datos fuera de la operación de ventas.
           </InfoButton>
         </div>
         <h1 id="sales-report-title" className="mt-2 text-2xl font-black tracking-tight text-white sm:text-3xl">Reportes</h1>
-        <p className="mt-2 max-w-2xl text-sm leading-relaxed text-slate-400">Consulta la cantidad y el total en MXN de las ventas de los tres canales operativos.</p>
+        <p className="mt-2 max-w-2xl text-sm leading-relaxed text-slate-400">Consulta el desempeño por canal, los productos más vendidos y el detalle seguro de las ventas del periodo.</p>
       </div>
       <div className="flex shrink-0 flex-wrap items-center gap-2 text-[10px] font-black uppercase tracking-widest text-slate-400">
         <span className="rounded-full border border-slate-700 bg-slate-950 px-3 py-1.5">Solo ventas</span>
@@ -163,11 +177,7 @@ export function SalesReportWorkspace() {
     <p role="status" aria-live="polite" aria-atomic="true" className="mt-4 min-h-6 text-sm font-medium text-slate-400">{isLoading ? 'Cargando reporte de ventas…' : loadState === 'ready' ? 'Reporte de ventas cargado.' : ''}</p>
 
     {loadState === 'loading' && <div aria-hidden="true" className="mt-2 grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
-      <div className="h-40 rounded-3xl border border-slate-800 bg-slate-950" />
-      <div className="h-40 rounded-3xl border border-slate-800 bg-slate-950" />
-      <div className="h-40 rounded-3xl border border-slate-800 bg-slate-950" />
-      <div className="h-40 rounded-3xl border border-slate-800 bg-slate-950" />
-      <div className="h-40 rounded-3xl border border-slate-800 bg-slate-950" />
+      {Array.from({ length: 5 }, (_, index) => <div key={index} className="h-40 rounded-3xl border border-slate-800 bg-slate-950" />)}
     </div>}
 
     {loadState === 'error' && <div ref={alert} tabIndex={-1} role="alert" className="mt-2 rounded-2xl border border-rose-500/30 bg-rose-500/10 p-4 text-rose-100">
@@ -177,7 +187,8 @@ export function SalesReportWorkspace() {
     </div>}
 
     {loadState === 'ready' && <div className="mt-2 space-y-6">
-      <div className="grid gap-4 sm:grid-cols-2">
+      <section aria-labelledby="sales-summary-title" className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        <h2 id="sales-summary-title" className="sr-only">Resumen de ventas</h2>
         <article className="rounded-3xl border border-slate-800 bg-slate-950 p-5 shadow-xl">
           <p className="text-[10px] font-black uppercase tracking-widest text-slate-500">Ventas acumuladas</p>
           <p className="mt-3 text-3xl font-black tracking-tight text-white">{formatMxn(combinedMxn)}</p>
@@ -186,9 +197,14 @@ export function SalesReportWorkspace() {
         <article className="rounded-3xl border border-slate-800 bg-slate-950 p-5 shadow-xl">
           <p className="text-[10px] font-black uppercase tracking-widest text-slate-500">Cantidad de ventas</p>
           <p className="mt-3 text-3xl font-black tracking-tight text-white">{totalSales}</p>
-          <p className="mt-3 border-t border-slate-800 pt-3 text-xs font-semibold text-slate-400">{totalSales} {totalSales === 1 ? 'venta' : 'ventas'} en Punto de venta, Mayoristas y Eventos</p>
+          <p className="mt-3 border-t border-slate-800 pt-3 text-xs font-semibold text-slate-400">{totalSales} {totalSales === 1 ? 'venta' : 'ventas'} en los tres canales operativos</p>
         </article>
-      </div>
+        <article className="rounded-3xl border border-slate-800 bg-slate-950 p-5 shadow-xl">
+          <p className="text-[10px] font-black uppercase tracking-widest text-slate-500">Ticket promedio</p>
+          <p className="mt-3 text-3xl font-black tracking-tight text-white">{formatMxn(averageSaleMxn)}</p>
+          <p className="mt-3 border-t border-slate-800 pt-3 text-xs font-semibold text-slate-400">Promedio sobre las ventas registradas del rango</p>
+        </article>
+      </section>
 
       {totalSales === 0 && <div className="rounded-2xl border border-dashed border-slate-700 bg-slate-950/60 p-4 text-sm text-slate-300">
         <p className="font-semibold">No se registraron ventas en este rango de fechas.</p>
@@ -222,6 +238,84 @@ export function SalesReportWorkspace() {
             </li>
           })}
         </ul>
+      </section>
+
+      <section aria-labelledby="top-products-title" className="rounded-3xl border border-slate-800 bg-slate-950 p-4 shadow-xl sm:p-5">
+        <div>
+          <h2 id="top-products-title" className="text-lg font-black text-white">Productos más vendidos</h2>
+          <p className="mt-1 text-xs leading-relaxed text-slate-500">Top 5 del detalle disponible, ordenado por cantidad y con importe acumulado.</p>
+        </div>
+        {topProducts.length > 0 ? <ol className="mt-5 divide-y divide-slate-800/80">
+          {topProducts.map((product, index) => <li key={product.productName} className="flex items-center justify-between gap-4 py-3 first:pt-0 last:pb-0">
+            <div className="flex min-w-0 items-center gap-3">
+              <span className="shrink-0 rounded-lg border border-slate-800 bg-slate-900 px-2 py-1 text-xs font-black text-slate-400">#{index + 1}</span>
+              <p className="truncate text-sm font-bold text-white">{product.productName}</p>
+            </div>
+            <div className="shrink-0 text-right">
+              <p className="text-xs font-black text-sky-400">{product.quantity} {product.quantity === 1 ? 'pieza' : 'piezas'}</p>
+              <p className="mt-0.5 text-[10px] font-semibold text-slate-500">{formatMxn(product.totalMxn)}</p>
+            </div>
+          </li>)}
+        </ol> : <div className="mt-5 rounded-2xl border border-dashed border-slate-700 p-6 text-center text-sm text-slate-400">Sin productos vendidos en el detalle del periodo.</div>}
+      </section>
+
+      <section aria-labelledby="sales-detail-title" className="rounded-3xl border border-slate-800 bg-slate-950 p-4 shadow-xl sm:p-5">
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+          <div className="min-w-0">
+            <h2 id="sales-detail-title" className="text-lg font-black text-white">Detalle de ventas</h2>
+            <p className="mt-1 text-xs leading-relaxed text-slate-500">Hasta 100 ventas más recientes del periodo, con sus productos e importes de línea.</p>
+          </div>
+          <span className="shrink-0 text-[10px] font-black uppercase tracking-widest text-slate-500">{details.length} {details.length === 1 ? 'línea' : 'líneas'} reportadas</span>
+        </div>
+        {details.length === 0 ? <div className="mt-5 rounded-2xl border border-dashed border-slate-700 p-6 text-center text-sm text-slate-400">No hay detalle de ventas para el rango seleccionado.</div> : <>
+          <ul aria-label="Detalle responsive de ventas" className="mt-5 space-y-3 md:hidden">
+            {details.map((row, index) => <li key={detailKey(row, index)} className="rounded-2xl border border-slate-800 bg-slate-900 p-4">
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="truncate text-xs font-black text-white">Venta {row.saleId}</p>
+                  <p className="mt-1 text-[11px] text-slate-400">{formatSaleDate(row.saleDate)}</p>
+                </div>
+                <span className="shrink-0 rounded-full border border-slate-700 px-2 py-1 text-[10px] font-black uppercase tracking-wider text-sky-400">{channelLabels[row.channel]}</span>
+              </div>
+              <dl className="mt-4 grid grid-cols-2 gap-3 border-t border-slate-800 pt-3 text-xs">
+                <div><dt className="text-slate-500">Contexto</dt><dd className="mt-1 truncate font-semibold text-slate-200">{row.contextLabel ?? 'Sin etiqueta'}</dd></div>
+                <div><dt className="text-slate-500">Producto</dt><dd className="mt-1 truncate font-semibold text-slate-200">{row.productName}</dd></div>
+                <div><dt className="text-slate-500">Cantidad</dt><dd className="mt-1 font-semibold text-slate-200">{row.quantity}</dd></div>
+                <div><dt className="text-slate-500">Importe de línea</dt><dd className="mt-1 font-black text-white">{formatMxn(row.lineTotalMxn)}</dd></div>
+                <div className="col-span-2"><dt className="text-slate-500">Total de la venta</dt><dd className="mt-1 font-black text-sky-400">{formatMxn(row.totalMxn)}</dd></div>
+              </dl>
+            </li>)}
+          </ul>
+          <div className="mt-5 hidden overflow-x-auto rounded-2xl border border-slate-800 bg-slate-950/40 md:block">
+            <table className="w-full min-w-[58rem] border-collapse text-left text-sm text-slate-300">
+              <caption className="sr-only">Detalle de ventas del rango seleccionado</caption>
+              <thead className="border-b border-slate-800 bg-slate-900 text-[10px] font-black uppercase tracking-wider text-slate-500">
+                <tr>
+                  <th className="px-4 py-4">Venta</th>
+                  <th className="px-4 py-4">Fecha</th>
+                  <th className="px-4 py-4">Canal</th>
+                  <th className="px-4 py-4">Contexto</th>
+                  <th className="px-4 py-4">Producto</th>
+                  <th className="px-4 py-4 text-right">Cantidad</th>
+                  <th className="px-4 py-4 text-right">Importe línea</th>
+                  <th className="px-4 py-4 text-right">Total venta</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-800/80">
+                {details.map((row, index) => <tr key={detailKey(row, index)} className="transition-colors hover:bg-slate-900/60">
+                  <td className="px-4 py-4 text-xs font-bold text-white">{row.saleId}</td>
+                  <td className="whitespace-nowrap px-4 py-4 text-xs font-semibold text-slate-300">{formatSaleDate(row.saleDate)}</td>
+                  <td className="px-4 py-4 text-xs font-semibold text-sky-400">{channelLabels[row.channel]}</td>
+                  <td className="max-w-[12rem] truncate px-4 py-4 text-xs font-semibold text-slate-300">{row.contextLabel ?? 'Sin etiqueta'}</td>
+                  <td className="px-4 py-4 text-xs font-semibold text-slate-200">{row.productName}</td>
+                  <td className="px-4 py-4 text-right text-xs font-bold text-slate-200">{row.quantity}</td>
+                  <td className="px-4 py-4 text-right text-xs font-black text-white">{formatMxn(row.lineTotalMxn)}</td>
+                  <td className="px-4 py-4 text-right text-xs font-black text-sky-400">{formatMxn(row.totalMxn)}</td>
+                </tr>)}
+              </tbody>
+            </table>
+          </div>
+        </>}
       </section>
     </div>}
   </section>

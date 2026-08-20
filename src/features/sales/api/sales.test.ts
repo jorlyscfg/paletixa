@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 const sdk = vi.hoisted(() => ({ database: { rpc: vi.fn() } }))
 vi.mock('../../../lib/insforge', () => ({ insforge: sdk }))
-import { getSalesByChannel, recordSale } from './sales'
+import { getSalesByChannel, getSalesReportDetail, recordSale } from './sales'
 
 describe('sales ledger API', () => {
   beforeEach(() => vi.resetAllMocks())
@@ -110,6 +110,28 @@ describe('sales ledger API', () => {
 
   it('rejects an unbounded report range before requesting the database', async () => {
     await expect(getSalesByChannel({ from: '2025-01-01T00:00:00Z', to: '2026-08-21T00:00:00Z' })).rejects.toThrow('limited to 366 days')
+    expect(sdk.database.rpc).not.toHaveBeenCalled()
+  })
+
+  it('maps server-authoritative detail rows and sends the same bounded range', async () => {
+    sdk.database.rpc.mockResolvedValue({
+      data: [{
+        sale_id: 'sale-1', sale_date: '2026-08-20T12:30:00Z', channel: 'wholesale', total_mxn: '145.00',
+        product_name: 'Mango', quantity: '2', line_total_mxn: '145.00', context_label: 'Tienda La Plaza',
+      }],
+      error: null,
+    })
+    await expect(getSalesReportDetail({ from: '2026-08-20T00:00:00Z', to: '2026-08-21T00:00:00Z' })).resolves.toEqual([{
+      saleId: 'sale-1', saleDate: '2026-08-20T12:30:00Z', channel: 'wholesale', totalMxn: 145,
+      productName: 'Mango', quantity: 2, lineTotalMxn: 145, contextLabel: 'Tienda La Plaza',
+    }])
+    expect(sdk.database.rpc).toHaveBeenCalledWith('report_sales_detail', {
+      p_from: '2026-08-20T00:00:00Z', p_to: '2026-08-21T00:00:00Z', p_limit: 100,
+    })
+  })
+
+  it('rejects an unbounded detail range before requesting the database', async () => {
+    await expect(getSalesReportDetail({ from: '2025-01-01T00:00:00Z', to: '2026-08-21T00:00:00Z' })).rejects.toThrow('limited to 366 days')
     expect(sdk.database.rpc).not.toHaveBeenCalled()
   })
 })

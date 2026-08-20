@@ -21,6 +21,16 @@ let reportTo: string
 let baseline: ReportRow[]
 
 type ReportRow = { channel: string; sale_count: number | string; total_mxn: number | string }
+type DetailRow = {
+  sale_id: string
+  sale_date: string
+  channel: string
+  total_mxn: number | string
+  product_name: string
+  quantity: number | string
+  line_total_mxn: number | string
+  context_label: string | null
+}
 type SaleDetails = Record<string, unknown>
 
 async function cli(command: string[]) {
@@ -156,9 +166,31 @@ describe.skipIf(!repeatable)('shared sales ledger contracts', () => {
     expect(Number(after.event.total_mxn) - Number(before.event.total_mxn)).toBe(63)
   }, 20_000)
 
+  it('returns safe detail rows for all channels and filters by date', async () => {
+    const detail = await data<DetailRow[]>(client.database.rpc('report_sales_detail', {
+      p_from: reportFrom, p_to: reportTo, p_limit: 100,
+    }))
+    const fixtureRows = detail.filter((row) => ['Contract POS', 'Contract Wholesale', 'Contract Event'].includes(row.context_label ?? ''))
+    expect(fixtureRows.map((row) => row.channel)).toEqual(expect.arrayContaining(['pos', 'wholesale', 'event']))
+    expect(fixtureRows).toEqual(expect.arrayContaining([
+      expect.objectContaining({ channel: 'pos', product_name: 'Ledger Mango', quantity: 2, line_total_mxn: 21, context_label: 'Contract POS' }),
+      expect.objectContaining({ channel: 'wholesale', product_name: 'Ledger Mango', quantity: 2, line_total_mxn: 14.5, context_label: 'Contract Wholesale' }),
+      expect.objectContaining({ channel: 'event', product_name: 'Ledger Mango', quantity: 3, line_total_mxn: 31.5, context_label: 'Contract Event' }),
+    ]))
+    expect(Object.keys(fixtureRows[0])).toEqual([
+      'sale_id', 'sale_date', 'channel', 'total_mxn', 'product_name', 'quantity', 'line_total_mxn', 'context_label',
+    ])
+    const previousDay = new Date(new Date(reportFrom).getTime() - 24 * 60 * 60 * 1000).toISOString()
+    const previousDetail = await data<DetailRow[]>(client.database.rpc('report_sales_detail', {
+      p_from: previousDay, p_to: reportFrom, p_limit: 100,
+    }))
+    expect(previousDetail.filter((row) => ['Contract POS', 'Contract Wholesale', 'Contract Event'].includes(row.context_label ?? ''))).toEqual([])
+  }, 20_000)
+
   it('does not expose either privileged RPC to anonymous callers', async () => {
     const anonymous = createClient({ baseUrl })
     await expect(data(anonymous.database.rpc('record_sale', { p_request_id: crypto.randomUUID(), p_channel: 'pos', p_items: [], p_details: { payment_method: 'cash' } }))).rejects.toThrow()
     await expect(data(anonymous.database.rpc('report_sales_by_channel', { p_from: reportFrom, p_to: reportTo }))).rejects.toThrow()
+    await expect(data(anonymous.database.rpc('report_sales_detail', { p_from: reportFrom, p_to: reportTo, p_limit: 100 }))).rejects.toThrow()
   }, 20_000)
 })
