@@ -1,12 +1,13 @@
 import { insforge } from '../../../lib/insforge'
+import { MAX_PRODUCT_TAG_LENGTH, MAX_PRODUCT_TAGS, syncProductTags } from './productTags'
 
-const PRODUCT_COLUMNS = 'id, name, sku, category_id, category:product_categories(id, name), retail_price_mxn, wholesale_price_mxn, active, tags, image_url, image_key, created_at, updated_at'
+export { MAX_PRODUCT_TAG_LENGTH, MAX_PRODUCT_TAGS } from './productTags'
+
+const PRODUCT_COLUMNS = 'id, name, sku, category_id, category:product_categories(id, name), retail_price_mxn, wholesale_price_mxn, active, tag_assignments:product_tag_assignments(tag:product_tags(name)), image_url, image_key, created_at, updated_at'
 
 export const PRODUCT_IMAGE_BUCKET = 'product-images'
 export const PRODUCT_IMAGE_MAX_BYTES = 5 * 1024 * 1024
 export const PRODUCT_IMAGE_MIME_TYPES = ['image/jpeg', 'image/png', 'image/webp'] as const
-export const MAX_PRODUCT_TAGS = 20
-export const MAX_PRODUCT_TAG_LENGTH = 48
 
 export type Product = {
   id: string
@@ -57,7 +58,7 @@ type ProductRow = {
   retail_price_mxn: number | string
   wholesale_price_mxn: number | string
   active: boolean
-  tags: string[] | null
+  tag_assignments: Array<{ tag: { name: string } | Array<{ name: string }> | null }> | null
   image_url: string | null
   image_key: string | null
   created_at: string
@@ -108,18 +109,18 @@ function normalizeCreate(input: CreateProductInput) {
 }
 
 function normalizeUpdate(input: UpdateProductInput) {
-  const result: Record<string, string | number | boolean | string[] | null> = {}
+  const result: Record<string, string | number | boolean> = {}
   if (input.name !== undefined) result.name = text(input.name, 'Product name')
   if (input.sku !== undefined) result.sku = text(input.sku, 'SKU')
   if (input.categoryId !== undefined) result.category_id = text(input.categoryId, 'Category ID')
   if (input.retailPriceMxn !== undefined) result.retail_price_mxn = price(input.retailPriceMxn, 'Retail price')
   if (input.wholesalePriceMxn !== undefined) result.wholesale_price_mxn = price(input.wholesalePriceMxn, 'Wholesale price')
-  if (input.tags !== undefined) result.tags = normalizeProductTags(input.tags)
+  if (input.tags !== undefined) normalizeProductTags(input.tags)
   if (input.active !== undefined) {
     if (typeof input.active !== 'boolean') throw new Error('Active state must be boolean')
     result.active = input.active
   }
-  if (Object.keys(result).length === 0) throw new Error('At least one product field is required')
+  if (Object.keys(result).length === 0 && input.tags === undefined) throw new Error('At least one product field is required')
   return result
 }
 
@@ -128,6 +129,7 @@ function mapProduct(data: unknown): Product {
   if (!row) throw new Error('Product response was empty')
   const category = Array.isArray(row.category) ? row.category[0] : row.category
   if (!row.category_id || !category?.id || !category.name) throw new Error('Product response is missing its category relation')
+  const tags = (row.tag_assignments ?? []).flatMap(({ tag }) => Array.isArray(tag) ? tag : tag ? [tag] : []).map(({ name }) => name)
   return {
     id: row.id,
     name: row.name,
@@ -137,12 +139,18 @@ function mapProduct(data: unknown): Product {
     retailPriceMxn: Number(row.retail_price_mxn),
     wholesalePriceMxn: Number(row.wholesale_price_mxn),
     active: row.active,
-    tags: normalizeProductTags(row.tags ?? []),
+    tags: normalizeProductTags(tags),
     imageUrl: row.image_url ?? null,
     imageKey: row.image_key ?? null,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   }
+}
+
+async function readProduct(productId: string): Promise<Product> {
+  const { data, error } = await insforge.database.from('products').select(PRODUCT_COLUMNS).eq('id', productId)
+  if (error) throw error
+  return mapProduct(data)
 }
 
 export async function listProducts(): Promise<Product[]> {
@@ -160,10 +168,12 @@ export async function createProduct(input: CreateProductInput): Promise<Product>
     retail_price_mxn: normalized.retailPriceMxn,
     wholesale_price_mxn: normalized.wholesalePriceMxn,
     active: normalized.active,
-    tags: normalized.tags,
   }]).select(PRODUCT_COLUMNS)
   if (error) throw error
-  return mapProduct(data)
+  const created = mapProduct(data)
+  if (input.tags === undefined) return created
+  await syncProductTags(created.id, normalized.tags)
+  return readProduct(created.id)
 }
 
 function operationError(message: string, errors: unknown[]) {
@@ -303,9 +313,19 @@ export async function removeProductImage(productId: string, currentImage: Produc
 
 export async function updateProduct(id: string, input: UpdateProductInput): Promise<Product> {
   const productId = text(id, 'Product ID')
-  const { data, error } = await insforge.database.from('products').update(normalizeUpdate(input)).eq('id', productId).select(PRODUCT_COLUMNS)
-  if (error) throw error
-  return mapProduct(data)
+  const normalized = normalizeUpdate(input)
+  let updated: Product | null = null
+  if (Object.keys(normalized).length > 0) {
+    const { data, error } = await insforge.database.from('products').update(normalized).eq('id', productId).select(PRODUCT_COLUMNS)
+    if (error) throw error
+    updated = mapProduct(data)
+  }
+  if (input.tags === undefined) {
+    if (!updated) throw new Error('Product update returned no product')
+    return updated
+  }
+  await syncProductTags(productId, normalizeProductTags(input.tags))
+  return readProduct(productId)
 }
 
 export function deactivateProduct(id: string) {

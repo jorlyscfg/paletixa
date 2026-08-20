@@ -3,6 +3,7 @@ import { CatalogImageTile } from '../../../app/components/CatalogImageTile'
 import { ResponsiveActionButton } from '../../../app/components/ResponsiveActionButton'
 import { SearchInput } from '../../../app/components/SearchInput'
 import { listProductCategories, type ProductCategory } from '../api/productCategories'
+import { listProductTags, type ProductTag } from '../api/productTags'
 import {
   createProduct,
   deactivateProduct,
@@ -77,9 +78,13 @@ function ProductForm({
   const [categoryInput, setCategoryInput] = useState(product?.category ?? '')
   const [categoryId, setCategoryId] = useState(initial.categoryId)
   const [categoryError, setCategoryError] = useState('')
+  const [categoryFocused, setCategoryFocused] = useState(false)
   const [categoryOpen, setCategoryOpen] = useState(false)
   const [activeCategoryIndex, setActiveCategoryIndex] = useState(0)
   const [tagInput, setTagInput] = useState('')
+  const [tagFocused, setTagFocused] = useState(false)
+  const [tagOpen, setTagOpen] = useState(false)
+  const [activeTagIndex, setActiveTagIndex] = useState(0)
   const [tagError, setTagError] = useState('')
   const [selectedImage, setSelectedImage] = useState<File | null>(null)
   const [imagePreviewUrl, setImagePreviewUrl] = useState<string | null>(null)
@@ -111,6 +116,8 @@ function ProductForm({
     try {
       setTags(normalizeProductTags([...tags, rawValue]))
       setTagInput('')
+      setTagOpen(false)
+      setActiveTagIndex(0)
       setTagError('')
     } catch (error) {
       setTagError(error instanceof Error ? error.message.replace('Tags', 'Las etiquetas') : 'No se pudo agregar la etiqueta.')
@@ -175,8 +182,12 @@ function ProductForm({
 
   const inputClassName = 'ops-control ops-focus min-h-11 w-full px-3 text-sm font-medium placeholder:text-slate-500'
   const imageActionClassName = 'inline-flex min-h-11 items-center justify-center rounded-xl border border-slate-700 bg-slate-900 px-3 text-sm font-bold text-slate-200 transition-colors hover:border-sky-500 hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400 disabled:pointer-events-none disabled:opacity-50'
-  const categoryMatches = categories.filter(({ name }) => normalizeCategoryFilter(name).includes(normalizeCategoryFilter(categoryInput)))
+  const categoryMatches = categoryInput.trim() === '' ? [] : categories.filter(({ name }) => normalizeCategoryFilter(name).includes(normalizeCategoryFilter(categoryInput)))
+  const tagMatches = tagInput.trim() === '' ? [] : tagSuggestions.filter((tag) => !tags.some((selectedTag) => normalizeCategoryFilter(selectedTag) === normalizeCategoryFilter(tag)) && normalizeCategoryFilter(tag).includes(normalizeCategoryFilter(tagInput)))
+  const categorySuggestionsVisible = categoryFocused && categoryOpen && categoryInput.trim() !== ''
+  const tagSuggestionsVisible = tagFocused && tagOpen && tagInput.trim() !== ''
   const categoryListId = 'product-category-options'
+  const tagListId = 'product-tag-options'
 
   return <form key={product?.id ?? 'new'} aria-label={product ? `Editar ${product.name}` : 'Crear producto'} className="grid gap-5 rounded-3xl border border-slate-800 bg-slate-950 p-4 shadow-xl sm:p-6" onSubmit={submit}>
     <div className="grid gap-4 sm:grid-cols-2">
@@ -185,16 +196,16 @@ function ProductForm({
       <div className="relative grid gap-2 text-sm font-semibold text-slate-300">
         <label htmlFor="product-category">Categoría</label>
         <div className="relative">
-          <input id="product-category" required maxLength={120} name="category" value={categoryInput} autoComplete="off" role="combobox" aria-autocomplete="list" aria-controls={categoryListId} aria-expanded={categoryOpen} aria-activedescendant={categoryOpen && categoryMatches[activeCategoryIndex] ? `product-category-option-${categoryMatches[activeCategoryIndex].id}` : undefined} aria-describedby="product-category-help product-category-error" className={`${inputClassName} pr-14`} onFocus={() => setCategoryOpen(true)} onChange={(event) => { setCategoryInput(event.target.value); setCategoryId(''); setCategoryError(''); setActiveCategoryIndex(0); setCategoryOpen(true) }} onKeyDown={(event) => {
+          <input id="product-category" required maxLength={120} name="category" value={categoryInput} autoComplete="off" role="combobox" aria-autocomplete="list" aria-controls={categoryListId} aria-expanded={categorySuggestionsVisible} aria-activedescendant={categorySuggestionsVisible && categoryMatches[activeCategoryIndex] ? `product-category-option-${categoryMatches[activeCategoryIndex].id}` : undefined} aria-describedby="product-category-help product-category-error" className={`${inputClassName} pr-14`} onFocus={() => { setCategoryFocused(true); setCategoryOpen(categoryInput.trim() !== '') }} onBlur={() => { setCategoryFocused(false); setCategoryOpen(false) }} onChange={(event) => { setCategoryInput(event.target.value); setCategoryId(''); setCategoryError(''); setActiveCategoryIndex(0); setCategoryOpen(event.target.value.trim() !== '') }} onKeyDown={(event) => {
             if (event.key === 'ArrowDown') {
               event.preventDefault()
-              setCategoryOpen(true)
+              setCategoryOpen(categoryInput.trim() !== '')
               setActiveCategoryIndex((current) => categoryMatches.length === 0 ? 0 : (current + 1) % categoryMatches.length)
             } else if (event.key === 'ArrowUp') {
               event.preventDefault()
-              setCategoryOpen(true)
+              setCategoryOpen(categoryInput.trim() !== '')
               setActiveCategoryIndex((current) => categoryMatches.length === 0 ? 0 : (current - 1 + categoryMatches.length) % categoryMatches.length)
-            } else if (event.key === 'Enter' && categoryOpen && categoryMatches[activeCategoryIndex]) {
+            } else if (event.key === 'Enter' && categorySuggestionsVisible && categoryMatches[activeCategoryIndex]) {
               event.preventDefault()
               setCategoryInput(categoryMatches[activeCategoryIndex].name)
               setCategoryId(categoryMatches[activeCategoryIndex].id)
@@ -204,9 +215,9 @@ function ProductForm({
               setCategoryOpen(false)
             }
           }} />
-          <button type="button" aria-label="Administrar categorías" title="Administrar categorías" disabled={busy} className="ops-focus absolute right-1 top-1/2 inline-flex min-h-11 min-w-11 -translate-y-1/2 items-center justify-center rounded-lg border border-slate-700 bg-slate-900 text-lg font-bold text-slate-200 hover:border-sky-500 hover:bg-slate-800 disabled:pointer-events-none disabled:opacity-50" onClick={onManageCategories}>+</button>
-          {categoryOpen && <ul id={categoryListId} role="listbox" aria-label="Categorías disponibles" className="absolute left-0 right-0 top-full z-30 mt-1 max-h-48 overflow-y-auto rounded-xl border border-slate-700 bg-slate-900 p-1 shadow-2xl">
-            {categoryMatches.length > 0 ? categoryMatches.map((category, index) => <li id={`product-category-option-${category.id}`} key={category.id} role="option" aria-selected={category.id === categoryId} className={`cursor-pointer rounded-lg px-3 py-2 text-sm font-semibold ${index === activeCategoryIndex ? 'bg-sky-500/15 text-white' : 'text-white/80 hover:bg-slate-800 hover:text-white'}`} onMouseDown={(event) => event.preventDefault()} onClick={() => { setCategoryInput(category.name); setCategoryId(category.id); setCategoryError(''); setCategoryOpen(false) }}>{category.name}</li>) : <li className="px-3 py-2 text-sm font-normal text-white/60">No hay categorías que coincidan.</li>}
+          <button type="button" aria-label="Administrar categorías" title="Administrar categorías" disabled={busy} className="ops-focus absolute right-1 top-1/2 inline-flex min-h-11 min-w-11 -translate-y-1/2 items-center justify-center rounded-lg bg-slate-900 text-lg font-bold text-slate-200 hover:bg-slate-800 focus-visible:ring-2 focus-visible:ring-sky-400 disabled:pointer-events-none disabled:opacity-50" onClick={onManageCategories}>+</button>
+          {categorySuggestionsVisible && <ul id={categoryListId} role="listbox" aria-label="Categorías disponibles" className="absolute left-0 right-0 top-full z-30 mt-1 max-h-48 overflow-y-auto rounded-xl border border-slate-700 bg-slate-900 p-1 shadow-2xl">
+            {categoryMatches.length > 0 ? categoryMatches.map((category, index) => <li id={`product-category-option-${category.id}`} key={category.id} role="option" aria-selected={category.id === categoryId} className={`flex min-h-11 cursor-pointer items-center rounded-lg px-3 py-2 text-sm font-semibold ${index === activeCategoryIndex ? 'bg-sky-500/15 text-white' : 'text-white/80 hover:bg-slate-800 hover:text-white'}`} onMouseDown={(event) => event.preventDefault()} onClick={() => { setCategoryInput(category.name); setCategoryId(category.id); setCategoryError(''); setCategoryOpen(false) }}>{category.name}</li>) : <li className="flex min-h-11 items-center px-3 py-2 text-sm font-normal text-white/60">No hay categorías que coincidan.</li>}
           </ul>}
         </div>
         <p id="product-category-help" className="text-xs font-normal leading-relaxed text-slate-500">Escribe para filtrar y selecciona una categoría existente.</p>
@@ -217,15 +228,36 @@ function ProductForm({
       <div className="grid gap-2 sm:col-span-2">
         <label htmlFor="product-tags" className="text-sm font-semibold text-slate-300">Etiquetas</label>
         <div className="flex flex-col gap-2 sm:flex-row">
-          <input id="product-tags" value={tagInput} maxLength={MAX_PRODUCT_TAG_LENGTH} list="product-tag-suggestions" className={`${inputClassName} sm:flex-1`} placeholder="Ej. paleta, mango, con chile" onChange={(event) => { setTagInput(event.target.value); setTagError('') }} onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ',') { event.preventDefault(); addTag() } }} aria-describedby="product-tags-help product-tags-error" />
-          <datalist id="product-tag-suggestions">{tagSuggestions.map((tag) => <option key={tag} value={tag} />)}</datalist>
+          <div className="relative min-w-0 sm:flex-1">
+            <input id="product-tags" value={tagInput} maxLength={MAX_PRODUCT_TAG_LENGTH} className={`${inputClassName} sm:flex-1`} placeholder="Ej. paleta, mango, con chile" autoComplete="off" role="combobox" aria-autocomplete="list" aria-controls={tagListId} aria-expanded={tagSuggestionsVisible} aria-activedescendant={tagSuggestionsVisible && tagMatches[activeTagIndex] ? `product-tag-option-${tagMatches[activeTagIndex]}` : undefined} onFocus={() => { setTagFocused(true); setTagOpen(tagInput.trim() !== '') }} onBlur={() => { setTagFocused(false); setTagOpen(false) }} onChange={(event) => { setTagInput(event.target.value); setTagError(''); setActiveTagIndex(0); setTagOpen(event.target.value.trim() !== '') }} onKeyDown={(event) => {
+              if (event.key === 'ArrowDown' && tagSuggestionsVisible) {
+                event.preventDefault()
+                setActiveTagIndex((current) => tagMatches.length === 0 ? 0 : (current + 1) % tagMatches.length)
+              } else if (event.key === 'ArrowUp' && tagSuggestionsVisible) {
+                event.preventDefault()
+                setActiveTagIndex((current) => tagMatches.length === 0 ? 0 : (current - 1 + tagMatches.length) % tagMatches.length)
+              } else if (event.key === 'Enter') {
+                event.preventDefault()
+                if (tagSuggestionsVisible && tagMatches[activeTagIndex]) addTag(tagMatches[activeTagIndex])
+                else addTag()
+              } else if (event.key === ',') {
+                event.preventDefault()
+                addTag()
+              } else if (event.key === 'Escape') {
+                setTagOpen(false)
+              }
+            }} aria-describedby="product-tags-help product-tags-error" />
+            {tagSuggestionsVisible && <ul id={tagListId} role="listbox" aria-label="Etiquetas disponibles" className="absolute left-0 right-0 top-full z-30 mt-1 max-h-48 overflow-y-auto rounded-xl border border-slate-700 bg-slate-900 p-1 shadow-2xl">
+              {tagMatches.length > 0 ? tagMatches.map((tag, index) => <li id={`product-tag-option-${tag}`} key={tag} role="option" aria-selected={false} className={`flex min-h-11 cursor-pointer items-center rounded-lg px-3 py-2 text-sm font-semibold ${index === activeTagIndex ? 'bg-sky-500/15 text-white' : 'text-white/80 hover:bg-slate-800 hover:text-white'}`} onMouseDown={(event) => event.preventDefault()} onClick={() => addTag(tag)}>{tag}</li>) : <li className="flex min-h-11 items-center px-3 py-2 text-sm font-normal text-white/60">No hay etiquetas que coincidan. Presiona Enter para agregarla.</li>}
+            </ul>}
+          </div>
           <ResponsiveActionButton type="button" label="Agregar etiqueta" mobileDisplay="text" disabled={busy || tags.length >= MAX_PRODUCT_TAGS} className="border border-slate-700 bg-slate-900 text-slate-200 hover:border-sky-500 hover:bg-slate-800 sm:w-auto" onClick={() => addTag()}>Agregar</ResponsiveActionButton>
         </div>
         <p id="product-tags-help" className="text-xs leading-relaxed text-slate-500">Usa etiquetas libres para familias como paletas, eskimos, bolis, nieves en vaso, aguas frescas o sandwiches, además de sabores, presentaciones y atributos. Hasta {MAX_PRODUCT_TAGS} etiquetas de {MAX_PRODUCT_TAG_LENGTH} caracteres.</p>
         {tags.length > 0 && <ul aria-label="Etiquetas seleccionadas" className="flex flex-wrap gap-2">
           {tags.map((tag) => <li key={tag} className="inline-flex min-h-9 items-center gap-1 rounded-full border border-sky-500/30 bg-sky-500/10 pl-3 pr-1 text-xs font-bold text-sky-200">
             <span>{tag}</span>
-            <button type="button" aria-label={`Quitar etiqueta ${tag}`} disabled={busy} className="min-h-7 min-w-7 rounded-full text-sky-300 hover:bg-sky-500/20 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400" onClick={() => removeTag(tag)}>×</button>
+            <button type="button" aria-label={`Quitar etiqueta ${tag}`} disabled={busy} className="min-h-11 min-w-11 rounded-full text-sky-300 hover:bg-sky-500/20 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400" onClick={() => removeTag(tag)}>×</button>
           </li>)}
         </ul>}
         {tagError && <p id="product-tags-error" role="alert" className="text-xs font-semibold text-rose-300">{tagError}</p>}
@@ -349,6 +381,7 @@ function ProductModal({
 export function ProductWorkspace() {
   const [products, setProducts] = useState<Product[]>([])
   const [productCategories, setProductCategories] = useState<ProductCategory[]>([])
+  const [productTags, setProductTags] = useState<ProductTag[]>([])
   const [state, setState] = useState<'loading' | 'ready' | 'error'>('loading')
   const [editing, setEditing] = useState<Product | null>(null)
   const [formOpen, setFormOpen] = useState(false)
@@ -366,10 +399,11 @@ export function ProductWorkspace() {
     const current = ++sequence.current
     setState('loading')
     try {
-      const [nextProducts, nextCategories] = await Promise.all([listProducts(), listProductCategories()])
+      const [nextProducts, nextCategories, nextTags] = await Promise.all([listProducts(), listProductCategories(), listProductTags()])
       if (current === sequence.current) {
         setProducts(nextProducts)
         setProductCategories(nextCategories)
+        setProductTags(nextTags)
         setState('ready')
       }
     } catch {
@@ -488,7 +522,7 @@ export function ProductWorkspace() {
   }
 
   const categories = [ALL_CATEGORIES, ...Array.from(new Set(products.map(({ category }) => category))).sort((a, b) => a.localeCompare(b))]
-  const tagSuggestions = Array.from(new Set(products.flatMap(({ tags }) => tags))).sort((a, b) => a.localeCompare(b))
+  const tagSuggestions = productTags.map(({ name }) => name)
   const filteredProducts = products.filter((product) => matchesProduct(product, searchQuery, selectedCategory))
 
   return <>

@@ -1,10 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-const sdk = vi.hoisted(() => ({ database: { from: vi.fn() }, storage: { from: vi.fn() } }))
+const sdk = vi.hoisted(() => ({ database: { from: vi.fn(), rpc: vi.fn() }, storage: { from: vi.fn() } }))
 vi.mock('../../../lib/insforge', () => ({ insforge: sdk }))
 import { createProduct, deactivateProduct, listProducts, removeProductImage, replaceProductImage, updateProduct } from './products'
 
-const row = { id: 'product-1', name: 'Mango', sku: ' M-01 ', category_id: 'category-1', category: { id: 'category-1', name: 'Paletas' }, retail_price_mxn: '42.50', wholesale_price_mxn: '35.00', active: true, tags: [' sabor ', 'fruta'], image_url: ' https://cdn.example.com/mango.jpg ', image_key: 'products/product-1/mango.jpg', created_at: '2026-08-20T00:00:00Z', updated_at: '2026-08-20T00:00:00Z' }
+const row = { id: 'product-1', name: 'Mango', sku: ' M-01 ', category_id: 'category-1', category: { id: 'category-1', name: 'Paletas' }, retail_price_mxn: '42.50', wholesale_price_mxn: '35.00', active: true, tag_assignments: [{ tag: { name: ' sabor ' } }, { tag: { name: 'fruta' } }], image_url: ' https://cdn.example.com/mango.jpg ', image_key: 'products/product-1/mango.jpg', created_at: '2026-08-20T00:00:00Z', updated_at: '2026-08-20T00:00:00Z' }
 
 describe('product catalog API', () => {
   beforeEach(() => vi.resetAllMocks())
@@ -20,23 +20,47 @@ describe('product catalog API', () => {
     const query = { select: vi.fn(), order: vi.fn() }
     sdk.database.from.mockReturnValue(query); query.select.mockReturnValue(query); query.order.mockResolvedValue({ data: [row], error: null })
     await expect(listProducts()).resolves.toEqual([{ id: 'product-1', name: 'Mango', sku: ' M-01 ', category: 'Paletas', categoryId: 'category-1', retailPriceMxn: 42.5, wholesalePriceMxn: 35, active: true, tags: ['sabor', 'fruta'], imageUrl: row.image_url, imageKey: row.image_key, createdAt: row.created_at, updatedAt: row.updated_at }])
-    expect(query.select).toHaveBeenCalledWith('id, name, sku, category_id, category:product_categories(id, name), retail_price_mxn, wholesale_price_mxn, active, tags, image_url, image_key, created_at, updated_at')
+    expect(query.select).toHaveBeenCalledWith('id, name, sku, category_id, category:product_categories(id, name), retail_price_mxn, wholesale_price_mxn, active, tag_assignments:product_tag_assignments(tag:product_tags(name)), image_url, image_key, created_at, updated_at')
   })
 
-  it('creates with the SDK array insert shape and trims text fields', async () => {
-    const query = { insert: vi.fn(), select: vi.fn() }
-    sdk.database.from.mockReturnValue(query); query.insert.mockReturnValue(query); query.select.mockResolvedValue({ data: [row], error: null })
+  it('maps relation tags, syncs them after create, and re-reads the product', async () => {
+    const insertQuery = { insert: vi.fn(), select: vi.fn() }
+    const readQuery = { select: vi.fn(), eq: vi.fn() }
+    sdk.database.from.mockReturnValueOnce(insertQuery).mockReturnValueOnce(readQuery)
+    insertQuery.insert.mockReturnValue(insertQuery); insertQuery.select.mockResolvedValue({ data: [row], error: null })
+    readQuery.select.mockReturnValue(readQuery); readQuery.eq.mockResolvedValue({ data: [row], error: null }); sdk.database.rpc.mockResolvedValue({ data: null, error: null })
     await createProduct({ name: ' Mango ', sku: 'M-01', categoryId: ' category-1 ', retailPriceMxn: 42.499, wholesalePriceMxn: 35, tags: [' sabor ', 'SABOR', ' fruta '] })
-    expect(query.insert).toHaveBeenCalledWith([{ name: 'Mango', sku: 'M-01', category_id: 'category-1', retail_price_mxn: 42.5, wholesale_price_mxn: 35, tags: ['sabor', 'fruta'], active: true }])
+    expect(insertQuery.insert).toHaveBeenCalledWith([{ name: 'Mango', sku: 'M-01', category_id: 'category-1', retail_price_mxn: 42.5, wholesale_price_mxn: 35, active: true }])
+    expect(sdk.database.rpc).toHaveBeenCalledWith('sync_product_tags', { p_product_id: 'product-1', p_tags: ['sabor', 'fruta'] })
+    expect(readQuery.eq).toHaveBeenCalledWith('id', 'product-1')
   })
 
-  it('updates fields through the typed API and deactivates without delete access', async () => {
+  it('updates fields without a legacy tags column and syncs the normalized assignments', async () => {
+    const updateQuery = { update: vi.fn(), eq: vi.fn(), select: vi.fn() }
+    const readQuery = { select: vi.fn(), eq: vi.fn() }
+    sdk.database.from.mockReturnValueOnce(updateQuery).mockReturnValueOnce(readQuery)
+    updateQuery.update.mockReturnValue(updateQuery); updateQuery.eq.mockReturnValue(updateQuery); updateQuery.select.mockResolvedValue({ data: [row], error: null })
+    readQuery.select.mockReturnValue(readQuery); readQuery.eq.mockResolvedValue({ data: [row], error: null }); sdk.database.rpc.mockResolvedValue({ data: null, error: null })
+    await updateProduct('product-1', { name: 'Mango Grande', categoryId: ' category-2 ', retailPriceMxn: 50, tags: [' con chile ', 'CON CHILE'] })
+    expect(updateQuery.update).toHaveBeenCalledWith({ name: 'Mango Grande', category_id: 'category-2', retail_price_mxn: 50 }); expect(updateQuery.eq).toHaveBeenCalledWith('id', 'product-1')
+    expect(sdk.database.rpc).toHaveBeenCalledWith('sync_product_tags', { p_product_id: 'product-1', p_tags: ['con chile'] })
+  })
+
+  it('clears all tag assignments when updating with an empty tag list', async () => {
+    const readQuery = { select: vi.fn(), eq: vi.fn() }
+    sdk.database.from.mockReturnValue(readQuery); readQuery.select.mockReturnValue(readQuery); readQuery.eq.mockResolvedValue({ data: [row], error: null }); sdk.database.rpc.mockResolvedValue({ data: null, error: null })
+    await updateProduct('product-1', { tags: [] })
+    expect(readQuery.select).toHaveBeenCalledWith(expect.stringContaining('tag_assignments:product_tag_assignments'))
+    expect(sdk.database.rpc).toHaveBeenCalledWith('sync_product_tags', { p_product_id: 'product-1', p_tags: [] })
+    expect(readQuery.eq).toHaveBeenCalledWith('id', 'product-1')
+  })
+
+  it('deactivates a product through the regular product update path', async () => {
     const query = { update: vi.fn(), eq: vi.fn(), select: vi.fn() }
     sdk.database.from.mockReturnValue(query); query.update.mockReturnValue(query); query.eq.mockReturnValue(query); query.select.mockResolvedValue({ data: [row], error: null })
-    await updateProduct('product-1', { name: 'Mango Grande', categoryId: ' category-2 ', retailPriceMxn: 50, tags: [' con chile ', 'CON CHILE'] })
-    expect(query.update).toHaveBeenCalledWith({ name: 'Mango Grande', category_id: 'category-2', retail_price_mxn: 50, tags: ['con chile'] }); expect(query.eq).toHaveBeenCalledWith('id', 'product-1')
     await deactivateProduct('product-1')
-    expect(query.update).toHaveBeenLastCalledWith({ active: false })
+    expect(query.update).toHaveBeenCalledWith({ active: false })
+    expect(query.eq).toHaveBeenCalledWith('id', 'product-1')
   })
 
   it('replaces an image, persists both storage references, and removes the old object', async () => {
