@@ -270,7 +270,7 @@ function ProductModal({
     }
   }, [requestClose])
 
-  return <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-950/80 p-4 backdrop-blur-sm sm:p-6" onClick={(event) => { if (event.target === event.currentTarget) requestClose() }}>
+  return <div className="fixed inset-0 z-50 overflow-hidden bg-slate-950/80 p-4 backdrop-blur-sm sm:p-6" onClick={(event) => { if (event.target === event.currentTarget) requestClose() }}>
     <div ref={dialogRef} role="dialog" aria-modal="true" aria-labelledby={headingId} className="mx-auto max-h-[calc(100vh-2rem)] w-full max-w-3xl overflow-y-auto rounded-3xl border border-slate-700 bg-slate-900 shadow-2xl sm:max-h-[calc(100vh-3rem)]">
       <div className="flex items-center justify-end border-b border-slate-800 px-4 py-3 sm:px-6">
         <button ref={closeButtonRef} type="button" aria-label="Cerrar formulario de producto" title="Cerrar formulario de producto" disabled={busy} className="ops-action ops-focus inline-flex min-h-11 min-w-11 items-center justify-center rounded-xl border border-slate-700 bg-slate-950 text-2xl leading-none text-slate-200 hover:border-sky-500 hover:bg-slate-800 disabled:pointer-events-none disabled:opacity-50" onClick={requestClose}>×</button>
