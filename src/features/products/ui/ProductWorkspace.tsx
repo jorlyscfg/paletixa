@@ -149,9 +149,7 @@ function ProductForm({
 
   return <form key={product?.id ?? 'new'} aria-label={product ? `Editar ${product.name}` : 'Crear producto'} className="grid gap-5 rounded-3xl border border-slate-800 bg-slate-950 p-4 shadow-xl sm:p-6" onSubmit={submit}>
     <div>
-      <p className="text-[11px] font-black uppercase tracking-[0.16em] text-sky-400">Configuración del catálogo</p>
-      <h2 id={headingId} className="mt-2 text-lg font-extrabold tracking-tight text-white">{product ? `Editar ${product.name}` : 'Agregar producto'}</h2>
-      <p className="mt-1 text-sm leading-relaxed text-slate-400">Mantén el catálogo compartido listo para Punto de venta, Mayoristas y Eventos.</p>
+      <h2 id={headingId} className="text-lg font-extrabold tracking-tight text-white">{product ? 'Editar producto' : 'Agregar producto'}</h2>
     </div>
     <div className="grid gap-4 sm:grid-cols-2">
       <label className="grid gap-2 text-sm font-semibold text-slate-300">Nombre<input required maxLength={160} name="name" defaultValue={initial.name} className={inputClassName} /></label>
@@ -271,12 +269,14 @@ function ProductModal({
   }, [requestClose])
 
   return <div className="fixed inset-0 z-50 overflow-hidden bg-slate-950/80 p-4 backdrop-blur-sm sm:p-6" onClick={(event) => { if (event.target === event.currentTarget) requestClose() }}>
-    <div ref={dialogRef} role="dialog" aria-modal="true" aria-labelledby={headingId} className="mx-auto max-h-[calc(100vh-2rem)] w-full max-w-3xl overflow-y-auto rounded-3xl border border-slate-700 bg-slate-900 shadow-2xl sm:max-h-[calc(100vh-3rem)]">
-      <div className="flex items-center justify-end border-b border-slate-800 px-4 py-3 sm:px-6">
+    <div ref={dialogRef} role="dialog" aria-modal="true" aria-labelledby={headingId} className="mx-auto flex max-h-[calc(100vh-2rem)] min-h-0 w-full max-w-3xl flex-col overflow-hidden rounded-3xl border border-slate-700 bg-slate-900 shadow-2xl sm:max-h-[calc(100vh-3rem)]">
+      <div className="flex shrink-0 items-center justify-end border-b border-slate-800 px-4 py-3 sm:px-6">
         <button ref={closeButtonRef} type="button" aria-label="Cerrar formulario de producto" title="Cerrar formulario de producto" disabled={busy} className="ops-action ops-focus inline-flex min-h-11 min-w-11 items-center justify-center rounded-xl border border-slate-700 bg-slate-950 text-2xl leading-none text-slate-200 hover:border-sky-500 hover:bg-slate-800 disabled:pointer-events-none disabled:opacity-50" onClick={requestClose}>×</button>
       </div>
-      {error && <div ref={errorRef} tabIndex={-1} role="alert" className="mx-4 mt-4 rounded-2xl border border-rose-500/20 bg-rose-500/10 p-4 text-sm font-semibold text-rose-300 sm:mx-6">{error}</div>}
-      <div className="p-4 sm:p-6"><ProductForm product={product} tagSuggestions={tagSuggestions} busy={busy} headingId={headingId} onCancel={requestClose} onSubmit={onSubmit} /></div>
+      <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
+        {error && <div ref={errorRef} tabIndex={-1} role="alert" className="mx-4 mt-4 rounded-2xl border border-rose-500/20 bg-rose-500/10 p-4 text-sm font-semibold text-rose-300 sm:mx-6">{error}</div>}
+        <div className="p-4 sm:p-6"><ProductForm product={product} tagSuggestions={tagSuggestions} busy={busy} headingId={headingId} onCancel={requestClose} onSubmit={onSubmit} /></div>
+      </div>
     </div>
   </div>
 }
