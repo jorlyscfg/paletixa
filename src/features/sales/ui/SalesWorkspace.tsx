@@ -149,7 +149,7 @@ function getSaleItems(products: Product[], quantities: QuantityByProduct) {
 function matchesSearch(product: Product, query: string) {
   const terms = query.trim().toLowerCase().split(/\s+/).filter(Boolean)
   if (terms.length === 0) return true
-  const searchableText = `${product.name} ${product.sku} ${product.category}`.toLowerCase()
+  const searchableText = `${product.name} ${product.sku} ${product.category} ${product.tags.join(' ')}`.toLowerCase()
   return terms.every((term) => searchableText.includes(term))
 }
 
@@ -478,7 +478,7 @@ export function SalesWorkspace({ channel }: { channel: SalesChannel }) {
               label="Buscar productos"
               value={searchQuery}
               onChange={setSearchQuery}
-              placeholder="Busca por producto, SKU o categoría"
+              placeholder="Busca por producto, SKU, categoría o etiqueta"
               containerClassName="w-full"
               className="border-slate-800 bg-slate-900/80 text-white placeholder:text-slate-500"
             />

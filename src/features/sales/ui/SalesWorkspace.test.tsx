@@ -7,7 +7,7 @@ import * as salesApi from '../api/sales'
 import { SalesWorkspace } from './SalesWorkspace'
 
 vi.mock('../../auth/api/adminAccess', () => ({ getAdminAccess: vi.fn(), signIn: vi.fn() }))
-vi.mock('../../products/api/products', () => ({ listProducts: vi.fn() }))
+vi.mock('../../products/api/products', () => ({ listProducts: vi.fn(), MAX_PRODUCT_TAG_LENGTH: 48, MAX_PRODUCT_TAGS: 20, PRODUCT_IMAGE_MAX_BYTES: 5 * 1024 * 1024, PRODUCT_IMAGE_MIME_TYPES: ['image/jpeg', 'image/png', 'image/webp'], normalizeProductTags: (value: unknown) => Array.isArray(value) ? value.map((tag) => String(tag).trim()).filter(Boolean) : [] }))
 vi.mock('../api/sales', () => ({
   EVENT_ADVANCE_PAYMENT_METHODS: ['cash', 'card'],
   POS_PAYMENT_METHODS: ['cash', 'card', 'transfer', 'other'],
@@ -17,8 +17,8 @@ vi.mock('../api/sales', () => ({
 }))
 
 const products: productApi.Product[] = [
-  { id: 'product-1', name: 'Mango', sku: 'M-01', category: 'Paletas', retailPriceMxn: 42.5, wholesalePriceMxn: 35, active: true, imageUrl: 'https://cdn.example.com/mango.jpg', createdAt: '2026-08-20T00:00:00Z', updatedAt: '2026-08-20T00:00:00Z' },
-  { id: 'product-2', name: 'Strawberry', sku: 'S-02', category: 'Creams', retailPriceMxn: 28, wholesalePriceMxn: 22, active: true, imageUrl: null, createdAt: '2026-08-20T00:00:00Z', updatedAt: '2026-08-20T00:00:00Z' },
+  { id: 'product-1', name: 'Mango', sku: 'M-01', category: 'Paletas', retailPriceMxn: 42.5, wholesalePriceMxn: 35, active: true, tags: ['fruta'], imageUrl: 'https://cdn.example.com/mango.jpg', imageKey: null, createdAt: '2026-08-20T00:00:00Z', updatedAt: '2026-08-20T00:00:00Z' },
+  { id: 'product-2', name: 'Strawberry', sku: 'S-02', category: 'Creams', retailPriceMxn: 28, wholesalePriceMxn: 22, active: true, tags: [], imageUrl: null, imageKey: null, createdAt: '2026-08-20T00:00:00Z', updatedAt: '2026-08-20T00:00:00Z' },
 ]
 const receipt: salesApi.SaleReceipt = { id: 'sale-1', channel: 'pos', totalMxn: 85, createdAt: '2026-08-20T00:00:00Z', replayed: false }
 const renderProtected = (channel: salesApi.SalesChannel = 'pos') => render(<AdminBoundary><SalesWorkspace channel={channel} /></AdminBoundary>)

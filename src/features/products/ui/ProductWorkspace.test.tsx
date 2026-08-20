@@ -6,9 +6,21 @@ import * as productApi from '../api/products'
 import { ProductWorkspace } from './ProductWorkspace'
 
 vi.mock('../../auth/api/adminAccess', () => ({ getAdminAccess: vi.fn(), signIn: vi.fn() }))
-vi.mock('../api/products', () => ({ listProducts: vi.fn(), createProduct: vi.fn(), updateProduct: vi.fn(), deactivateProduct: vi.fn() }))
+vi.mock('../api/products', () => ({
+  listProducts: vi.fn(),
+  createProduct: vi.fn(),
+  updateProduct: vi.fn(),
+  deactivateProduct: vi.fn(),
+  replaceProductImage: vi.fn(),
+  removeProductImage: vi.fn(),
+  normalizeProductTags: (value: unknown) => Array.isArray(value) ? value.map((tag) => String(tag).trim()).filter(Boolean) : [],
+  MAX_PRODUCT_TAG_LENGTH: 48,
+  MAX_PRODUCT_TAGS: 20,
+  PRODUCT_IMAGE_MAX_BYTES: 5 * 1024 * 1024,
+  PRODUCT_IMAGE_MIME_TYPES: ['image/jpeg', 'image/png', 'image/webp'],
+}))
 
-const product: productApi.Product = { id: 'product-1', name: 'Mango', sku: 'M-01', category: 'Paletas', retailPriceMxn: 42.5, wholesalePriceMxn: 35, active: true, imageUrl: 'https://cdn.example.com/mango.jpg', createdAt: '2026-08-20T00:00:00Z', updatedAt: '2026-08-20T00:00:00Z' }
+const product: productApi.Product = { id: 'product-1', name: 'Mango', sku: 'M-01', category: 'Paletas', retailPriceMxn: 42.5, wholesalePriceMxn: 35, active: true, tags: ['fruta', 'con chile'], imageUrl: 'https://cdn.example.com/mango.jpg', imageKey: 'products/product-1/mango.jpg', createdAt: '2026-08-20T00:00:00Z', updatedAt: '2026-08-20T00:00:00Z' }
 const renderProtected = () => render(<AdminBoundary><ProductWorkspace /></AdminBoundary>)
 
 describe('admin product workspace', () => {
@@ -34,7 +46,7 @@ describe('admin product workspace', () => {
   })
 
   it('filters catalog cards by search terms and category', async () => {
-    const strawberry: productApi.Product = { ...product, id: 'product-2', name: 'Strawberry', sku: 'S-02', category: 'Ice cream', imageUrl: null, active: false }
+    const strawberry: productApi.Product = { ...product, id: 'product-2', name: 'Strawberry', sku: 'S-02', category: 'Ice cream', tags: [], imageUrl: null, imageKey: null, active: false }
     vi.mocked(productApi.listProducts).mockResolvedValue([product, strawberry])
     renderProtected()
 
@@ -46,11 +58,16 @@ describe('admin product workspace', () => {
     expect(screen.getAllByText('$42.50 MXN')).toHaveLength(2)
     expect(screen.getAllByText('$35.00 MXN')).toHaveLength(2)
     expect(screen.getByText('Inactivo')).toBeInTheDocument()
+    expect(screen.getByText('con chile')).toBeInTheDocument()
 
     const search = screen.getByRole('searchbox', { name: 'Buscar productos' })
     fireEvent.change(search, { target: { value: 'straw' } })
     expect(screen.getByRole('heading', { name: 'Strawberry' })).toBeInTheDocument()
     expect(screen.queryByRole('heading', { name: 'Mango' })).not.toBeInTheDocument()
+
+    fireEvent.change(search, { target: { value: 'chile' } })
+    expect(screen.getByRole('heading', { name: 'Mango' })).toBeInTheDocument()
+    expect(screen.queryByRole('heading', { name: 'Strawberry' })).not.toBeInTheDocument()
 
     fireEvent.change(search, { target: { value: '' } })
     fireEvent.click(screen.getByRole('tab', { name: 'Filtrar por Ice cream' }))
@@ -61,9 +78,9 @@ describe('admin product workspace', () => {
   it('creates a product from the catalog form', async () => {
     vi.mocked(productApi.createProduct).mockResolvedValue(product)
     renderProtected(); await screen.findByText('Aún no hay productos. Agrega el primero para iniciar el catálogo compartido.')
-    fireEvent.change(screen.getByLabelText('Nombre'), { target: { value: 'Mango' } }); fireEvent.change(screen.getByLabelText('SKU / código'), { target: { value: 'M-01' } }); fireEvent.change(screen.getByLabelText('Categoría'), { target: { value: 'Paletas' } }); fireEvent.change(screen.getByLabelText('Precio de menudeo (MXN)'), { target: { value: '42.5' } }); fireEvent.change(screen.getByLabelText('Precio mayorista (MXN)'), { target: { value: '35' } }); fireEvent.change(screen.getByLabelText('URL de imagen (opcional)'), { target: { value: 'https://cdn.example.com/mango.jpg' } })
+    fireEvent.change(screen.getByLabelText('Nombre'), { target: { value: 'Mango' } }); fireEvent.change(screen.getByLabelText('SKU / código'), { target: { value: 'M-01' } }); fireEvent.change(screen.getByLabelText('Categoría'), { target: { value: 'Paletas' } }); fireEvent.change(screen.getByLabelText('Precio de menudeo (MXN)'), { target: { value: '42.5' } }); fireEvent.change(screen.getByLabelText('Precio mayorista (MXN)'), { target: { value: '35' } }); fireEvent.change(screen.getByLabelText('Etiquetas'), { target: { value: 'fruta' } }); fireEvent.keyDown(screen.getByLabelText('Etiquetas'), { key: 'Enter' })
     fireEvent.submit(screen.getByRole('form', { name: 'Crear producto' }))
-    expect(await screen.findByText('Producto creado.')).toBeInTheDocument(); expect(productApi.createProduct).toHaveBeenCalledWith({ name: 'Mango', sku: 'M-01', category: 'Paletas', retailPriceMxn: 42.5, wholesalePriceMxn: 35, imageUrl: 'https://cdn.example.com/mango.jpg', active: true })
+    expect(await screen.findByText('Producto creado.')).toBeInTheDocument(); expect(productApi.createProduct).toHaveBeenCalledWith({ name: 'Mango', sku: 'M-01', category: 'Paletas', retailPriceMxn: 42.5, wholesalePriceMxn: 35, tags: ['fruta'], active: true })
   })
 
   it('updates and deactivates an existing product', async () => {
@@ -72,5 +89,41 @@ describe('admin product workspace', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Editar Mango' })); fireEvent.change(screen.getByLabelText('Nombre'), { target: { value: 'Mango Grande' } }); fireEvent.submit(screen.getByRole('form', { name: 'Editar Mango' }))
     expect(await screen.findByText('Producto actualizado.')).toBeInTheDocument(); expect(productApi.updateProduct).toHaveBeenCalledWith('product-1', expect.objectContaining({ name: 'Mango Grande' }))
     fireEvent.click(screen.getByRole('button', { name: 'Desactivar Mango Grande' })); expect(await screen.findByText('Producto desactivado.')).toBeInTheDocument(); expect(productApi.deactivateProduct).toHaveBeenCalledWith('product-1')
+  })
+
+  it('selects an image for preview and replaces it only after saving', async () => {
+    const created = { ...product, imageUrl: null, imageKey: null, tags: [] }
+    const uploaded = { ...created, imageUrl: 'https://storage.example.com/mango.webp', imageKey: 'products/product-1/new.webp' }
+    vi.mocked(productApi.createProduct).mockResolvedValue(created)
+    vi.mocked(productApi.replaceProductImage).mockResolvedValue(uploaded)
+    renderProtected(); await screen.findByText('Aún no hay productos. Agrega el primero para iniciar el catálogo compartido.')
+
+    const file = new File(['image'], 'mango.webp', { type: 'image/webp' })
+    fireEvent.change(screen.getByLabelText('Seleccionar imagen'), { target: { files: [file] } })
+    expect(await screen.findByText('Lista para guardar: mango.webp')).toBeInTheDocument()
+    fireEvent.submit(screen.getByRole('form', { name: 'Crear producto' }))
+
+    expect(await screen.findByText('Producto creado.')).toBeInTheDocument()
+    expect(productApi.replaceProductImage).toHaveBeenCalledWith('product-1', created, file)
+  })
+
+  it('shows a validation error for unsupported image files', async () => {
+    renderProtected(); await screen.findByText('Aún no hay productos. Agrega el primero para iniciar el catálogo compartido.')
+    fireEvent.change(screen.getByLabelText('Seleccionar imagen'), { target: { files: [new File(['svg'], 'mango.svg', { type: 'image/svg+xml' })] } })
+    expect(screen.getByRole('alert', { name: '' })).toHaveTextContent('Selecciona una imagen JPEG, PNG o WebP.')
+    expect(productApi.createProduct).not.toHaveBeenCalled()
+  })
+
+  it('marks an existing image for removal and calls the explicit lifecycle operation', async () => {
+    vi.mocked(productApi.listProducts).mockResolvedValue([product])
+    vi.mocked(productApi.updateProduct).mockResolvedValue(product)
+    vi.mocked(productApi.removeProductImage).mockResolvedValue({ ...product, imageUrl: null, imageKey: null })
+    renderProtected(); await screen.findByRole('heading', { name: 'Mango' })
+    fireEvent.click(screen.getByRole('button', { name: 'Editar Mango' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Quitar imagen' }))
+    fireEvent.submit(screen.getByRole('form', { name: 'Editar Mango' }))
+
+    expect(await screen.findByText('Producto actualizado.')).toBeInTheDocument()
+    expect(productApi.removeProductImage).toHaveBeenCalledWith('product-1', product)
   })
 })
