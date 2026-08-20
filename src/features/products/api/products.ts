@@ -1,6 +1,6 @@
 import { insforge } from '../../../lib/insforge'
 
-const PRODUCT_COLUMNS = 'id, name, sku, category, retail_price_mxn, wholesale_price_mxn, active, created_at, updated_at'
+const PRODUCT_COLUMNS = 'id, name, sku, category, retail_price_mxn, wholesale_price_mxn, active, image_url, created_at, updated_at'
 
 export type Product = {
   id: string
@@ -10,6 +10,7 @@ export type Product = {
   retailPriceMxn: number
   wholesalePriceMxn: number
   active: boolean
+  imageUrl: string | null
   createdAt: string
   updatedAt: string
 }
@@ -20,6 +21,7 @@ export type CreateProductInput = {
   category: string
   retailPriceMxn: number
   wholesalePriceMxn: number
+  imageUrl?: string | null
   active?: boolean
 }
 
@@ -33,6 +35,7 @@ type ProductRow = {
   retail_price_mxn: number | string
   wholesale_price_mxn: number | string
   active: boolean
+  image_url: string | null
   created_at: string
   updated_at: string
 }
@@ -47,6 +50,24 @@ function price(value: unknown, field: string) {
   return Math.round(value * 100) / 100
 }
 
+function imageUrl(value: unknown, field = 'Image URL') {
+  if (value === undefined || value === null) return null
+  if (typeof value !== 'string') throw new Error(`${field} must be a valid HTTP(S) URL`)
+
+  const normalized = value.trim()
+  if (normalized === '') return null
+
+  try {
+    const parsed = new URL(normalized)
+    if (!['http:', 'https:'].includes(parsed.protocol) || parsed.username || parsed.password) {
+      throw new Error('unsafe image URL')
+    }
+    return parsed.toString()
+  } catch {
+    throw new Error(`${field} must be a valid HTTP(S) URL`)
+  }
+}
+
 function normalizeCreate(input: CreateProductInput) {
   return {
     name: text(input.name, 'Product name'),
@@ -54,17 +75,19 @@ function normalizeCreate(input: CreateProductInput) {
     category: text(input.category, 'Category'),
     retailPriceMxn: price(input.retailPriceMxn, 'Retail price'),
     wholesalePriceMxn: price(input.wholesalePriceMxn, 'Wholesale price'),
+    imageUrl: imageUrl(input.imageUrl),
     active: input.active ?? true,
   }
 }
 
 function normalizeUpdate(input: UpdateProductInput) {
-  const result: Record<string, string | number | boolean> = {}
+  const result: Record<string, string | number | boolean | null> = {}
   if (input.name !== undefined) result.name = text(input.name, 'Product name')
   if (input.sku !== undefined) result.sku = text(input.sku, 'SKU')
   if (input.category !== undefined) result.category = text(input.category, 'Category')
   if (input.retailPriceMxn !== undefined) result.retail_price_mxn = price(input.retailPriceMxn, 'Retail price')
   if (input.wholesalePriceMxn !== undefined) result.wholesale_price_mxn = price(input.wholesalePriceMxn, 'Wholesale price')
+  if (input.imageUrl !== undefined) result.image_url = imageUrl(input.imageUrl)
   if (input.active !== undefined) {
     if (typeof input.active !== 'boolean') throw new Error('Active state must be boolean')
     result.active = input.active
@@ -84,6 +107,7 @@ function mapProduct(data: unknown): Product {
     retailPriceMxn: Number(row.retail_price_mxn),
     wholesalePriceMxn: Number(row.wholesale_price_mxn),
     active: row.active,
+    imageUrl: row.image_url ?? null,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   }
@@ -104,6 +128,7 @@ export async function createProduct(input: CreateProductInput): Promise<Product>
     retail_price_mxn: normalized.retailPriceMxn,
     wholesale_price_mxn: normalized.wholesalePriceMxn,
     active: normalized.active,
+    image_url: normalized.imageUrl,
   }]).select(PRODUCT_COLUMNS)
   if (error) throw error
   return mapProduct(data)

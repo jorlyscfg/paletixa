@@ -3,18 +3,76 @@ import { CatalogImageTile } from '../../../app/components/CatalogImageTile'
 import { ResponsiveActionButton } from '../../../app/components/ResponsiveActionButton'
 import { SearchInput } from '../../../app/components/SearchInput'
 import { listProducts, type Product } from '../../products/api/products'
-import { recordSale, type SaleReceipt, type SalesChannel, SALES_CHANNELS } from '../api/sales'
+import { recordSale, type SaleReceipt, type SalesChannel } from '../api/sales'
 
 type QuantityByProduct = Record<string, string>
 type LoadState = 'loading' | 'ready' | 'error'
 type Submission = { status: 'submitting' | 'error' | 'success'; requestId: string; receipt?: SaleReceipt }
 
-const channelLabels: Record<SalesChannel, string> = { pos: 'Punto de venta', wholesale: 'Mayoristas', event: 'Eventos' }
-const channelPriceLabels: Record<SalesChannel, string> = { pos: 'menudeo', wholesale: 'mayoreo', event: 'menudeo' }
+type ChannelPresentation = {
+  label: string
+  eyebrow: string
+  title: string
+  description: string
+  productsTitle: string
+  productsDescription: string
+  priceLabel: string
+  accentClass: string
+  actionClass: string
+  cardBorderClass: string
+  categorySelectedClass: string
+  quantityBadgeClass: string
+  productButtonClass: string
+}
+
+const channelPresentations: Record<SalesChannel, ChannelPresentation> = {
+  pos: {
+    label: 'Punto de venta',
+    eyebrow: 'Venta en mostrador',
+    title: 'Registrar venta en punto de venta',
+    description: 'Registra una venta de mostrador con el catálogo compartido. El servidor confirma los precios y el total antes de guardarla.',
+    productsTitle: 'Productos para mostrador',
+    productsDescription: 'Selecciona productos y ajusta las cantidades para esta venta.',
+    priceLabel: 'Precio de menudeo',
+    accentClass: 'text-sky-400',
+    actionClass: 'bg-sky-600 text-white shadow-lg shadow-sky-950/30 hover:bg-sky-500',
+    cardBorderClass: 'border-sky-500/40',
+    categorySelectedClass: 'border-sky-400 bg-sky-500/15 text-sky-200',
+    quantityBadgeClass: 'border-sky-400/30 bg-sky-500/90',
+    productButtonClass: 'hover:border-sky-500',
+  },
+  wholesale: {
+    label: 'Mayoristas',
+    eyebrow: 'Venta por volumen',
+    title: 'Registrar venta mayorista',
+    description: 'Prepara una venta por volumen con precios mayoristas. El servidor confirma el total antes de registrarla en el registro unificado de ventas.',
+    productsTitle: 'Productos para mayoristas',
+    productsDescription: 'Selecciona productos y arma el pedido con las cantidades acordadas.',
+    priceLabel: 'Precio de mayoreo',
+    accentClass: 'text-amber-400',
+    actionClass: 'bg-amber-600 text-white shadow-lg shadow-amber-950/30 hover:bg-amber-500',
+    cardBorderClass: 'border-amber-500/40',
+    categorySelectedClass: 'border-amber-400 bg-amber-500/15 text-amber-200',
+    quantityBadgeClass: 'border-amber-400/30 bg-amber-500/90',
+    productButtonClass: 'hover:border-amber-500',
+  },
+  event: {
+    label: 'Eventos',
+    eyebrow: 'Venta para eventos',
+    title: 'Registrar venta para evento',
+    description: 'Arma una venta para un evento con los productos compartidos. Este canal aplica el precio de menudeo al registrar la venta.',
+    productsTitle: 'Productos para eventos',
+    productsDescription: 'Selecciona los productos y cantidades que llevarás a la venta del evento.',
+    priceLabel: 'Precio para evento',
+    accentClass: 'text-violet-400',
+    actionClass: 'bg-violet-600 text-white shadow-lg shadow-violet-950/30 hover:bg-violet-500',
+    cardBorderClass: 'border-violet-500/40',
+    categorySelectedClass: 'border-violet-400 bg-violet-500/15 text-violet-200',
+    quantityBadgeClass: 'border-violet-400/30 bg-violet-500/90',
+    productButtonClass: 'hover:border-violet-500',
+  },
+}
 const ALL_CATEGORIES = 'Todas las categorías'
-const selectedChannelClass = 'bg-sky-600 text-white shadow-lg shadow-sky-950/30'
-const inactiveChannelClass = 'text-slate-300 hover:bg-slate-800 hover:text-white'
-const selectedCategoryClass = 'border-sky-400 bg-sky-500/15 text-sky-200'
 const inactiveCategoryClass = 'border-slate-800 bg-slate-900/60 text-slate-300 hover:border-slate-700 hover:text-white'
 
 function formatMxn(value: number) {
@@ -50,10 +108,9 @@ function createRequestId() {
   return typeof randomUUID === 'function' ? randomUUID.call(globalThis.crypto) : `sale-${Date.now()}-${Math.random().toString(36).slice(2)}`
 }
 
-export function SalesWorkspace({ initialChannel = 'pos' }: { initialChannel?: SalesChannel }) {
+export function SalesWorkspace({ channel }: { channel: SalesChannel }) {
   const [products, setProducts] = useState<Product[]>([])
   const [loadState, setLoadState] = useState<LoadState>('loading')
-  const [channel, setChannel] = useState<SalesChannel>(initialChannel)
   const [searchQuery, setSearchQuery] = useState('')
   const [selectedCategory, setSelectedCategory] = useState(ALL_CATEGORIES)
   const [quantities, setQuantities] = useState<QuantityByProduct>({})
@@ -87,13 +144,6 @@ export function SalesWorkspace({ initialChannel = 'pos' }: { initialChannel?: Sa
   useEffect(() => {
     if (loadError || validationError || submission?.status === 'error') alert.current?.focus()
   }, [loadError, validationError, submission])
-
-  function changeChannel(next: SalesChannel) {
-    setChannel(next)
-    setReviewed(false)
-    setValidationError('')
-    setSubmission(null)
-  }
 
   function changeQuantity(productId: string, value: string) {
     setQuantities((current) => ({ ...current, [productId]: value }))
@@ -159,6 +209,7 @@ export function SalesWorkspace({ initialChannel = 'pos' }: { initialChannel?: Sa
 
   const isSubmitting = submission?.status === 'submitting'
   const isComplete = submission?.status === 'success'
+  const presentation = channelPresentations[channel]
   const categories = [ALL_CATEGORIES, ...Array.from(new Set(products.map((product) => product.category).filter(Boolean)))]
   const filteredProducts = products.filter((product) => {
     const matchesCategory = selectedCategory === ALL_CATEGORIES || product.category === selectedCategory
@@ -172,9 +223,9 @@ export function SalesWorkspace({ initialChannel = 'pos' }: { initialChannel?: Sa
   return <section aria-labelledby="sales-title" className="w-full rounded-[1.75rem] border border-slate-800 bg-slate-950 p-4 text-slate-100 shadow-xl sm:p-6 lg:p-8">
     <div className="flex flex-wrap items-end justify-between gap-4">
       <div>
-        <p className="text-xs font-bold uppercase tracking-[0.16em] text-sky-400">{channelLabels[channel]}</p>
-        <h1 id="sales-title" className="mt-2 text-2xl font-black tracking-tight text-white sm:text-3xl">Registrar una venta</h1>
-        <p className="mt-2 max-w-2xl text-sm leading-relaxed text-slate-400">Elige un canal, agrega productos al carrito y revisa el total confirmado por el servidor antes de registrarlo.</p>
+        <p className={`text-xs font-bold uppercase tracking-[0.16em] ${presentation.accentClass}`}>{presentation.eyebrow}</p>
+        <h1 id="sales-title" className="mt-2 text-2xl font-black tracking-tight text-white sm:text-3xl">{presentation.title}</h1>
+        <p className="mt-2 max-w-2xl text-sm leading-relaxed text-slate-400">{presentation.description}</p>
       </div>
       <ResponsiveActionButton
         type="button"
@@ -189,28 +240,13 @@ export function SalesWorkspace({ initialChannel = 'pos' }: { initialChannel?: Sa
 
     <form onSubmit={reviewSale} className="mt-7 grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(19rem,24rem)]">
       <div className="min-w-0">
-        <section aria-labelledby="channel-title" className="border-b border-slate-800 pb-5">
+        <section aria-labelledby="product-list-title" className="border-b border-slate-800 pb-5">
           <div className="flex flex-wrap items-end justify-between gap-3">
             <div>
-              <h2 id="channel-title" className="text-sm font-bold uppercase tracking-[0.12em] text-slate-300">Canal de venta</h2>
-              <p className="mt-1 text-xs text-slate-500">Punto de venta y Eventos usan precios de menudeo. Mayoristas usa precios mayoristas.</p>
+              <h2 id="product-list-title" className={`text-sm font-bold uppercase tracking-[0.12em] ${presentation.accentClass}`}>{presentation.productsTitle}</h2>
+              <p className="mt-1 text-xs text-slate-500">{presentation.productsDescription}</p>
             </div>
             <span className="text-xs font-semibold text-slate-500">{products.length} productos activos</span>
-          </div>
-          <div role="tablist" aria-label="Canal de venta" className="mt-4 grid grid-cols-3 gap-1 rounded-2xl border border-slate-800 bg-slate-900/70 p-1">
-            {SALES_CHANNELS.map((option) => <ResponsiveActionButton
-              key={option}
-              id={`${option}-tab`}
-              type="button"
-              role="tab"
-              aria-selected={channel === option}
-              aria-controls="sale-products"
-              label={channelLabels[option]}
-              mobileDisplay="text"
-              disabled={isComplete}
-              onClick={() => changeChannel(option)}
-              className={channel === option ? selectedChannelClass : inactiveChannelClass}
-            >{channelLabels[option]}</ResponsiveActionButton>)}
           </div>
         </section>
 
@@ -229,7 +265,7 @@ export function SalesWorkspace({ initialChannel = 'pos' }: { initialChannel?: Sa
 
         {loadState === 'ready' && products.length === 0 && <p className="mt-6 rounded-2xl border border-dashed border-slate-700 bg-slate-900/50 p-6 text-sm text-slate-300">No hay productos activos en el catálogo. Agrega un producto activo antes de registrar una venta.</p>}
 
-        {loadState === 'ready' && products.length > 0 && <div id="sale-products" role="tabpanel" aria-labelledby={`${channel}-tab`} className="mt-6">
+        {loadState === 'ready' && products.length > 0 && <div id="sale-products" role="tabpanel" aria-labelledby="product-list-title" className="mt-6">
           <div className="flex flex-col gap-4">
             <SearchInput
               label="Buscar productos"
@@ -248,7 +284,7 @@ export function SalesWorkspace({ initialChannel = 'pos' }: { initialChannel?: Sa
                 label={category}
                 mobileDisplay="text"
                 onClick={() => setSelectedCategory(category)}
-                className={`shrink-0 border px-4 text-xs ${selectedCategory === category ? selectedCategoryClass : inactiveCategoryClass}`}
+                className={`shrink-0 border px-4 text-xs ${selectedCategory === category ? presentation.categorySelectedClass : inactiveCategoryClass}`}
               >{category}</ResponsiveActionButton>)}
             </div>
           </div>
@@ -270,17 +306,17 @@ export function SalesWorkspace({ initialChannel = 'pos' }: { initialChannel?: Sa
               const price = priceFor(product, channel)
               return <article key={product.id} data-testid="sales-product-card" className="group flex min-w-0 flex-col rounded-2xl border border-slate-800 bg-slate-900/65 p-3 transition-colors hover:border-slate-700 hover:bg-slate-900">
                 <CatalogImageTile
-                  src={null}
+                  src={product.imageUrl}
                   alt={product.name}
                   imageClassName="transition-transform duration-200 group-hover:scale-105"
                   className="aspect-square w-full border-slate-800 bg-slate-950"
                 >
-                  {quantity > 0 && <span className="absolute right-2 top-2 rounded-full border border-sky-400/30 bg-sky-500/90 px-2 py-1 text-[10px] font-black text-white">{quantity} en el carrito</span>}
+                  {quantity > 0 && <span className={`absolute right-2 top-2 rounded-full border px-2 py-1 text-[10px] font-black text-white ${presentation.quantityBadgeClass}`}>{quantity} en el carrito</span>}
                 </CatalogImageTile>
                 <div className="mt-3 min-w-0">
                   <h3 className="truncate text-sm font-bold text-white" title={product.name}>{product.name}</h3>
                   <p className="mt-1 truncate text-[11px] font-semibold uppercase tracking-wide text-slate-500">{product.category} · {product.sku}</p>
-                  <p className="mt-2 text-xs font-semibold text-slate-300">Precio de {channelPriceLabels[channel]} <span className="font-black text-white">{formatMxn(price)}</span></p>
+                  <p className="mt-2 text-xs font-semibold text-slate-300">{presentation.priceLabel} <span className="font-black text-white">{formatMxn(price)}</span></p>
                 </div>
                 <ResponsiveActionButton
                   type="button"
@@ -288,7 +324,7 @@ export function SalesWorkspace({ initialChannel = 'pos' }: { initialChannel?: Sa
                   mobileDisplay="text"
                   disabled={isSubmitting || isComplete}
                   onClick={() => addProduct(product.id)}
-                  className="mt-3 w-full border border-slate-700 bg-slate-950 text-slate-200 hover:border-sky-500 hover:text-white"
+                  className={`mt-3 w-full border border-slate-700 bg-slate-950 text-slate-200 hover:text-white ${presentation.productButtonClass}`}
                 >{quantity > 0 ? 'Agregar más' : 'Agregar a la venta'}</ResponsiveActionButton>
               </article>
             })}
@@ -296,11 +332,11 @@ export function SalesWorkspace({ initialChannel = 'pos' }: { initialChannel?: Sa
         </div>}
       </div>
 
-      <aside aria-labelledby={reviewed ? 'review-title' : 'cart-title'} className={`h-fit rounded-2xl border bg-slate-900/85 p-4 shadow-xl lg:sticky lg:top-6 ${reviewed ? 'border-sky-500/40' : 'border-slate-800'}`}>
+      <aside aria-labelledby={reviewed ? 'review-title' : 'cart-title'} className={`h-fit rounded-2xl border bg-slate-900/85 p-4 shadow-xl lg:sticky lg:top-6 ${reviewed ? presentation.cardBorderClass : 'border-slate-800'}`}>
         <div className="flex items-start justify-between gap-3 border-b border-slate-800 pb-4">
           <div>
             <h2 id={reviewed ? 'review-title' : 'cart-title'} className="text-base font-black text-white">{reviewed ? 'Revisar venta' : 'Resumen del carrito'}</h2>
-            <p className="mt-1 text-xs text-slate-500">{channelLabels[channel]} · {itemCount} {itemCount === 1 ? 'artículo' : 'artículos'}</p>
+            <p className="mt-1 text-xs text-slate-500">{presentation.label} · {itemCount} {itemCount === 1 ? 'artículo' : 'artículos'}</p>
           </div>
           {cartProducts.length > 0 && <ResponsiveActionButton type="button" label="Vaciar selección de venta" icon="close" mobileDisplay="text" onClick={clearCart} disabled={isSubmitting || isComplete} className="text-xs text-slate-400 hover:bg-slate-800 hover:text-white">Vaciar</ResponsiveActionButton>}
         </div>
@@ -318,7 +354,7 @@ export function SalesWorkspace({ initialChannel = 'pos' }: { initialChannel?: Sa
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
                   <h3 className="truncate text-sm font-bold text-white" title={product.name}>{product.name}</h3>
-                  <p className="mt-1 text-xs text-slate-500">{channelLabels[channel]} · {formatMxn(price)} / unidad</p>
+                  <p className="mt-1 text-xs text-slate-500">{presentation.label} · {presentation.priceLabel} · {formatMxn(price)} / unidad</p>
                 </div>
                 <span className="shrink-0 text-sm font-black text-white">{quantity === null ? '—' : formatMxn(quantity * price)}</span>
               </div>
@@ -357,7 +393,7 @@ export function SalesWorkspace({ initialChannel = 'pos' }: { initialChannel?: Sa
         {submission?.status === 'success' && submission.receipt && <div role="status" className="mt-4 rounded-xl border border-emerald-500/30 bg-emerald-500/10 p-4 text-emerald-100">
           <h3 className="font-bold">{submission.receipt.replayed ? 'La venta ya estaba registrada' : 'Venta registrada'}</h3>
           <dl className="mt-3 grid gap-2 text-sm">
-            <div className="flex justify-between gap-4"><dt>Canal</dt><dd className="font-semibold">{channelLabels[submission.receipt.channel]}</dd></div>
+            <div className="flex justify-between gap-4"><dt>Canal</dt><dd className="font-semibold">{channelPresentations[submission.receipt.channel].label}</dd></div>
             <div className="flex justify-between gap-4"><dt>Total confirmado</dt><dd className="font-semibold">{formatMxn(submission.receipt.totalMxn)}</dd></div>
             <div className="flex justify-between gap-4"><dt>ID del recibo</dt><dd className="max-w-[12rem] truncate font-semibold" title={submission.receipt.id}>{submission.receipt.id}</dd></div>
           </dl>
@@ -365,7 +401,7 @@ export function SalesWorkspace({ initialChannel = 'pos' }: { initialChannel?: Sa
         </div>}
 
         {!isComplete && submission?.status !== 'error' && <div className="mt-5 max-lg:sticky max-lg:bottom-3 max-lg:z-10 max-lg:-mx-1 max-lg:rounded-2xl max-lg:bg-slate-900/95 max-lg:p-1">
-          {!reviewed ? <ResponsiveActionButton type="submit" label="Revisar venta" icon="sale" mobileDisplay="text" disabled={isSubmitting || cartProducts.length === 0} className="w-full bg-sky-600 text-white shadow-lg shadow-sky-950/30 hover:bg-sky-500 disabled:opacity-40">Revisar venta</ResponsiveActionButton> : <ResponsiveActionButton type="button" label={isSubmitting ? 'Registrando venta' : 'Registrar venta'} icon="sale" mobileDisplay="text" loading={isSubmitting} loadingLabel="Registrando venta" disabled={isSubmitting || saleItems.length === 0} onClick={() => void submitSale()} className="w-full bg-sky-600 text-white shadow-lg shadow-sky-950/30 hover:bg-sky-500 disabled:opacity-40">{isSubmitting ? 'Registrando venta' : 'Registrar venta'}</ResponsiveActionButton>}
+          {!reviewed ? <ResponsiveActionButton type="submit" label="Revisar venta" icon="sale" mobileDisplay="text" disabled={isSubmitting || cartProducts.length === 0} className={`w-full disabled:opacity-40 ${presentation.actionClass}`}>Revisar venta</ResponsiveActionButton> : <ResponsiveActionButton type="button" label={isSubmitting ? 'Registrando venta' : 'Registrar venta'} icon="sale" mobileDisplay="text" loading={isSubmitting} loadingLabel="Registrando venta" disabled={isSubmitting || saleItems.length === 0} onClick={() => void submitSale()} className={`w-full disabled:opacity-40 ${presentation.actionClass}`}>{isSubmitting ? 'Registrando venta' : 'Registrar venta'}</ResponsiveActionButton>}
         </div>}
       </aside>
     </form>

@@ -7,7 +7,7 @@ import { ProductWorkspace } from './features/products/ui/ProductWorkspace'
 import { SalesReportWorkspace } from './features/sales/ui/SalesReportWorkspace'
 import { SalesWorkspace } from './features/sales/ui/SalesWorkspace'
 
-const salesModules = { pos: 'pos', wholesale: 'wholesale', events: 'event' } as const
+const salesChannelsByModule = { pos: 'pos', wholesale: 'wholesale', events: 'event' } as const
 
 function App() {
   const [activeModule, setActiveModule] = useState<AppModule>('catalog')
@@ -17,7 +17,7 @@ function App() {
       ? <SalesReportWorkspace />
       : activeModule === 'branches'
         ? <BranchWorkspace />
-        : <SalesWorkspace key={activeModule} initialChannel={salesModules[activeModule]} />
+        : <SalesWorkspace key={activeModule} channel={salesChannelsByModule[activeModule]} />
 
   return <AppProviders><a href="#main-content" className="sr-only z-10 rounded-md bg-slate-950 px-4 py-3 text-white focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:ring-offset-2">Saltar al contenido principal</a><AdminBoundary><AppShell activeModule={activeModule} onModuleChange={setActiveModule}>{view}</AppShell></AdminBoundary></AppProviders>
 }

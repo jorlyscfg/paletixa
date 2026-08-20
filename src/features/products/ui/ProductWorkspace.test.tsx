@@ -8,7 +8,7 @@ import { ProductWorkspace } from './ProductWorkspace'
 vi.mock('../../auth/api/adminAccess', () => ({ getAdminAccess: vi.fn(), signIn: vi.fn() }))
 vi.mock('../api/products', () => ({ listProducts: vi.fn(), createProduct: vi.fn(), updateProduct: vi.fn(), deactivateProduct: vi.fn() }))
 
-const product: productApi.Product = { id: 'product-1', name: 'Mango', sku: 'M-01', category: 'Paletas', retailPriceMxn: 42.5, wholesalePriceMxn: 35, active: true, createdAt: '2026-08-20T00:00:00Z', updatedAt: '2026-08-20T00:00:00Z' }
+const product: productApi.Product = { id: 'product-1', name: 'Mango', sku: 'M-01', category: 'Paletas', retailPriceMxn: 42.5, wholesalePriceMxn: 35, active: true, imageUrl: 'https://cdn.example.com/mango.jpg', createdAt: '2026-08-20T00:00:00Z', updatedAt: '2026-08-20T00:00:00Z' }
 const renderProtected = () => render(<AdminBoundary><ProductWorkspace /></AdminBoundary>)
 
 describe('admin product workspace', () => {
@@ -34,13 +34,15 @@ describe('admin product workspace', () => {
   })
 
   it('filters catalog cards by search terms and category', async () => {
-    const strawberry: productApi.Product = { ...product, id: 'product-2', name: 'Strawberry', sku: 'S-02', category: 'Ice cream', active: false }
+    const strawberry: productApi.Product = { ...product, id: 'product-2', name: 'Strawberry', sku: 'S-02', category: 'Ice cream', imageUrl: null, active: false }
     vi.mocked(productApi.listProducts).mockResolvedValue([product, strawberry])
     renderProtected()
 
     expect(await screen.findByRole('heading', { name: 'Mango' })).toBeInTheDocument()
     expect(screen.getByRole('heading', { name: 'Strawberry' })).toBeInTheDocument()
     expect(screen.getByRole('img', { name: 'Imagen de Mango' })).toBeInTheDocument()
+    expect(screen.getByRole('img', { name: 'Imagen de Mango' })).toHaveAttribute('src', 'https://cdn.example.com/mango.jpg')
+    expect(screen.getByRole('img', { name: 'Imagen de Strawberry' })).toHaveAttribute('aria-label', 'Imagen de Strawberry')
     expect(screen.getAllByText('$42.50 MXN')).toHaveLength(2)
     expect(screen.getAllByText('$35.00 MXN')).toHaveLength(2)
     expect(screen.getByText('Inactivo')).toBeInTheDocument()
@@ -59,9 +61,9 @@ describe('admin product workspace', () => {
   it('creates a product from the catalog form', async () => {
     vi.mocked(productApi.createProduct).mockResolvedValue(product)
     renderProtected(); await screen.findByText('Aún no hay productos. Agrega el primero para iniciar el catálogo compartido.')
-    fireEvent.change(screen.getByLabelText('Nombre'), { target: { value: 'Mango' } }); fireEvent.change(screen.getByLabelText('SKU / código'), { target: { value: 'M-01' } }); fireEvent.change(screen.getByLabelText('Categoría'), { target: { value: 'Paletas' } }); fireEvent.change(screen.getByLabelText('Precio de menudeo (MXN)'), { target: { value: '42.5' } }); fireEvent.change(screen.getByLabelText('Precio mayorista (MXN)'), { target: { value: '35' } })
+    fireEvent.change(screen.getByLabelText('Nombre'), { target: { value: 'Mango' } }); fireEvent.change(screen.getByLabelText('SKU / código'), { target: { value: 'M-01' } }); fireEvent.change(screen.getByLabelText('Categoría'), { target: { value: 'Paletas' } }); fireEvent.change(screen.getByLabelText('Precio de menudeo (MXN)'), { target: { value: '42.5' } }); fireEvent.change(screen.getByLabelText('Precio mayorista (MXN)'), { target: { value: '35' } }); fireEvent.change(screen.getByLabelText('URL de imagen (opcional)'), { target: { value: 'https://cdn.example.com/mango.jpg' } })
     fireEvent.submit(screen.getByRole('form', { name: 'Crear producto' }))
-    expect(await screen.findByText('Producto creado.')).toBeInTheDocument(); expect(productApi.createProduct).toHaveBeenCalledWith({ name: 'Mango', sku: 'M-01', category: 'Paletas', retailPriceMxn: 42.5, wholesalePriceMxn: 35, active: true })
+    expect(await screen.findByText('Producto creado.')).toBeInTheDocument(); expect(productApi.createProduct).toHaveBeenCalledWith({ name: 'Mango', sku: 'M-01', category: 'Paletas', retailPriceMxn: 42.5, wholesalePriceMxn: 35, imageUrl: 'https://cdn.example.com/mango.jpg', active: true })
   })
 
   it('updates and deactivates an existing product', async () => {

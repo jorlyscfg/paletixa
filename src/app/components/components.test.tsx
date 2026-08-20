@@ -38,4 +38,12 @@ describe('operations primitives', () => {
     fireEvent.keyDown(document, { key: 'Escape' }); expect(onInfoToggle).toHaveBeenCalled()
     expect(screen.getByText('Sin imagen')).toBeInTheDocument()
   })
+
+  it('renders a product image and switches to the fallback after an image error', () => {
+    render(<CatalogImageTile src="https://cdn.example.com/producto.jpg" alt="Imagen del producto" fallback="Sin imagen" />)
+    const image = screen.getByRole('img', { name: 'Imagen del producto' })
+    expect(image).toHaveAttribute('src', 'https://cdn.example.com/producto.jpg')
+    fireEvent.error(image)
+    expect(screen.getByText('Sin imagen')).toBeInTheDocument()
+  })
 })

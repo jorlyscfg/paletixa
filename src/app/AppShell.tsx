@@ -4,19 +4,19 @@ import { Icon, type IconName } from './components/icons'
 
 export type AppModule = 'catalog' | 'pos' | 'wholesale' | 'events' | 'reports' | 'branches'
 
-const modules: Array<{ id: AppModule; label: string; description: string; icon: IconName }> = [
-  { id: 'catalog', label: 'Catálogo', description: 'Productos compartidos', icon: 'catalog' },
-  { id: 'pos', label: 'Punto de venta', description: 'Venta en mostrador', icon: 'sale' },
-  { id: 'wholesale', label: 'Mayoristas', description: 'Venta por volumen', icon: 'sale' },
-  { id: 'events', label: 'Eventos', description: 'Ventas para eventos', icon: 'sale' },
-  { id: 'reports', label: 'Reportes', description: 'Visibilidad de ventas', icon: 'reports' },
-  { id: 'branches', label: 'Sucursales', description: 'Acceso administrativo', icon: 'branches' },
+const modules: Array<{ id: AppModule; label: string; description: string; icon: IconName; activeClass: string; iconClass: string }> = [
+  { id: 'catalog', label: 'Catálogo', description: 'Productos compartidos', icon: 'catalog', activeClass: 'bg-sky-700 shadow-lg shadow-sky-950/25', iconClass: 'text-sky-300' },
+  { id: 'pos', label: 'Punto de venta', description: 'Venta en mostrador', icon: 'sale', activeClass: 'bg-cyan-700 shadow-lg shadow-cyan-950/25', iconClass: 'text-cyan-300' },
+  { id: 'wholesale', label: 'Mayoristas', description: 'Venta por volumen', icon: 'package', activeClass: 'bg-amber-600 shadow-lg shadow-amber-950/25', iconClass: 'text-amber-300' },
+  { id: 'events', label: 'Eventos', description: 'Ventas para eventos', icon: 'calendar', activeClass: 'bg-violet-700 shadow-lg shadow-violet-950/25', iconClass: 'text-violet-300' },
+  { id: 'reports', label: 'Reportes', description: 'Visibilidad de ventas', icon: 'reports', activeClass: 'bg-emerald-700 shadow-lg shadow-emerald-950/25', iconClass: 'text-emerald-300' },
+  { id: 'branches', label: 'Sucursales', description: 'Acceso administrativo', icon: 'branches', activeClass: 'bg-indigo-700 shadow-lg shadow-indigo-950/25', iconClass: 'text-indigo-300' },
 ]
 
 function ModuleNavigation({ activeModule, onModuleChange, mobile = false }: { activeModule: AppModule; onModuleChange: (module: AppModule) => void; mobile?: boolean }) {
   return <nav aria-label={mobile ? 'Navegación de módulos móvil' : 'Navegación de módulos de escritorio'} className="grid gap-1">
-    {modules.map((module) => <button key={module.id} type="button" aria-label={module.label} aria-current={activeModule === module.id ? 'page' : undefined} onClick={() => onModuleChange(module.id)} className={`ops-focus flex min-h-11 items-center gap-3 rounded-xl px-3 text-left transition-colors ${activeModule === module.id ? 'bg-sky-700 shadow-lg shadow-sky-950/25' : 'hover:bg-slate-800'}`}>
-      <Icon name={module.icon} className={`h-5 w-5 shrink-0 ${activeModule === module.id ? 'text-white' : 'text-slate-300'}`} /><span className="min-w-0"><span className={`block text-sm font-semibold ${activeModule === module.id ? 'text-white' : 'text-slate-300'}`}>{module.label}</span><span className={`block truncate text-xs ${activeModule === module.id ? 'text-sky-100' : 'text-slate-500'}`}>{module.description}</span></span>
+    {modules.map((module) => <button key={module.id} type="button" aria-label={module.label} aria-current={activeModule === module.id ? 'page' : undefined} onClick={() => onModuleChange(module.id)} className={`ops-focus flex min-h-11 items-center gap-3 rounded-xl px-3 text-left transition-colors ${activeModule === module.id ? module.activeClass : 'hover:bg-slate-800'}`}>
+      <Icon name={module.icon} className={`h-5 w-5 shrink-0 ${activeModule === module.id ? 'text-white' : module.iconClass}`} /><span className="min-w-0"><span className={`block text-sm font-semibold ${activeModule === module.id ? 'text-white' : 'text-slate-300'}`}>{module.label}</span><span className={`block truncate text-xs ${activeModule === module.id ? 'text-white/80' : 'text-slate-500'}`}>{module.description}</span></span>
     </button>)}
   </nav>
 }

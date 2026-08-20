@@ -8,14 +8,14 @@ import { SalesWorkspace } from './SalesWorkspace'
 
 vi.mock('../../auth/api/adminAccess', () => ({ getAdminAccess: vi.fn(), signIn: vi.fn() }))
 vi.mock('../../products/api/products', () => ({ listProducts: vi.fn() }))
-vi.mock('../api/sales', () => ({ SALES_CHANNELS: ['pos', 'wholesale', 'event'], recordSale: vi.fn() }))
+vi.mock('../api/sales', () => ({ recordSale: vi.fn() }))
 
 const products: productApi.Product[] = [
-  { id: 'product-1', name: 'Mango', sku: 'M-01', category: 'Paletas', retailPriceMxn: 42.5, wholesalePriceMxn: 35, active: true, createdAt: '2026-08-20T00:00:00Z', updatedAt: '2026-08-20T00:00:00Z' },
-  { id: 'product-2', name: 'Strawberry', sku: 'S-02', category: 'Creams', retailPriceMxn: 28, wholesalePriceMxn: 22, active: true, createdAt: '2026-08-20T00:00:00Z', updatedAt: '2026-08-20T00:00:00Z' },
+  { id: 'product-1', name: 'Mango', sku: 'M-01', category: 'Paletas', retailPriceMxn: 42.5, wholesalePriceMxn: 35, active: true, imageUrl: 'https://cdn.example.com/mango.jpg', createdAt: '2026-08-20T00:00:00Z', updatedAt: '2026-08-20T00:00:00Z' },
+  { id: 'product-2', name: 'Strawberry', sku: 'S-02', category: 'Creams', retailPriceMxn: 28, wholesalePriceMxn: 22, active: true, imageUrl: null, createdAt: '2026-08-20T00:00:00Z', updatedAt: '2026-08-20T00:00:00Z' },
 ]
 const receipt: salesApi.SaleReceipt = { id: 'sale-1', channel: 'pos', totalMxn: 85, createdAt: '2026-08-20T00:00:00Z', replayed: false }
-const renderProtected = () => render(<AdminBoundary><SalesWorkspace /></AdminBoundary>)
+const renderProtected = (channel: salesApi.SalesChannel = 'pos') => render(<AdminBoundary><SalesWorkspace channel={channel} /></AdminBoundary>)
 
 describe('sales workspace', () => {
   afterEach(cleanup)
@@ -64,14 +64,24 @@ describe('sales workspace', () => {
     expect(screen.queryByRole('heading', { name: 'Strawberry' })).not.toBeInTheDocument()
   })
 
-  it('changes channels and displays the active channel price', async () => {
+  it.each([
+    ['pos', 'Registrar venta en punto de venta', 'Precio de menudeo', '$42.50 MXN'],
+    ['wholesale', 'Registrar venta mayorista', 'Precio de mayoreo', '$35.00 MXN'],
+    ['event', 'Registrar venta para evento', 'Precio para evento', '$42.50 MXN'],
+  ] as const)('renders the fixed %s channel as a distinct module', async (channel, title, priceLabel, price) => {
+    renderProtected(channel)
+    expect(await screen.findByRole('heading', { name: title })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: 'Mango' })).toBeInTheDocument()
+    expect(screen.getAllByText(priceLabel, { exact: true }).length).toBeGreaterThan(0)
+    expect(screen.getAllByText(price).length).toBeGreaterThan(0)
+    expect(screen.queryByRole('tablist', { name: 'Canal de venta' })).not.toBeInTheDocument()
+  })
+
+  it('maps product images into sale cards and keeps the fallback tile', async () => {
     renderProtected()
     await screen.findByRole('heading', { name: 'Mango' })
-    expect(screen.getAllByText(/Precio de menudeo/).some((element) => element.textContent?.includes('$42.50 MXN'))).toBe(true)
-    fireEvent.click(screen.getByRole('tab', { name: 'Mayoristas' }))
-    expect(screen.getAllByText(/Precio de mayoreo/).some((element) => element.textContent?.includes('$35.00 MXN'))).toBe(true)
-    fireEvent.click(screen.getByRole('tab', { name: 'Eventos' }))
-    expect(screen.getAllByText(/Precio de menudeo/).some((element) => element.textContent?.includes('$42.50 MXN'))).toBe(true)
+    expect(screen.getByRole('img', { name: 'Mango' })).toHaveAttribute('src', 'https://cdn.example.com/mango.jpg')
+    expect(screen.getByRole('img', { name: 'Strawberry' })).toHaveAttribute('aria-label', 'Strawberry')
   })
 
   it('changes cart quantities with touch-sized stepper controls', async () => {

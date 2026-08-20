@@ -7,7 +7,7 @@ import { createProduct, deactivateProduct, listProducts, updateProduct, type Cre
 type Draft = CreateProductInput & { active: boolean }
 
 const ALL_CATEGORIES = 'Todas las categorías'
-const emptyDraft: Draft = { name: '', sku: '', category: '', retailPriceMxn: 0, wholesalePriceMxn: 0, active: true }
+const emptyDraft: Draft = { name: '', sku: '', category: '', retailPriceMxn: 0, wholesalePriceMxn: 0, imageUrl: '', active: true }
 
 function formatPrice(value: number) {
   return `$${value.toFixed(2)} MXN`
@@ -24,7 +24,7 @@ function matchesProduct(product: Product, query: string, category: string) {
 }
 
 function ProductForm({ product, busy, onCancel, onSubmit }: { product: Product | null; busy: boolean; onCancel: () => void; onSubmit: (draft: Draft) => void }) {
-  const initial = product ? { name: product.name, sku: product.sku, category: product.category, retailPriceMxn: product.retailPriceMxn, wholesalePriceMxn: product.wholesalePriceMxn, active: product.active } : emptyDraft
+  const initial = product ? { name: product.name, sku: product.sku, category: product.category, retailPriceMxn: product.retailPriceMxn, wholesalePriceMxn: product.wholesalePriceMxn, imageUrl: product.imageUrl ?? '', active: product.active } : emptyDraft
 
   function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
@@ -35,6 +35,7 @@ function ProductForm({ product, busy, onCancel, onSubmit }: { product: Product |
       category: String(values.get('category') ?? ''),
       retailPriceMxn: Number(values.get('retailPriceMxn')),
       wholesalePriceMxn: Number(values.get('wholesalePriceMxn')),
+      imageUrl: String(values.get('imageUrl') ?? ''),
       active: values.get('active') === 'on',
     })
   }
@@ -53,6 +54,7 @@ function ProductForm({ product, busy, onCancel, onSubmit }: { product: Product |
       <label className="grid gap-2 text-sm font-semibold text-slate-300">Categoría<input required maxLength={120} name="category" defaultValue={initial.category} className={inputClassName} /></label>
       <label className="grid gap-2 text-sm font-semibold text-slate-300">Precio de menudeo (MXN)<input required min="0" step="0.01" name="retailPriceMxn" type="number" defaultValue={initial.retailPriceMxn} className={inputClassName} /></label>
       <label className="grid gap-2 text-sm font-semibold text-slate-300">Precio mayorista (MXN)<input required min="0" step="0.01" name="wholesalePriceMxn" type="number" defaultValue={initial.wholesalePriceMxn} className={inputClassName} /></label>
+      <label className="grid gap-2 text-sm font-semibold text-slate-300 sm:col-span-2">URL de imagen (opcional)<input maxLength={2048} name="imageUrl" type="url" inputMode="url" placeholder="https://ejemplo.com/producto.jpg" defaultValue={initial.imageUrl ?? ''} className={inputClassName} /></label>
     </div>
     <label className="flex min-h-11 items-center gap-3 text-sm font-semibold text-slate-300"><input name="active" type="checkbox" defaultChecked={initial.active} className="h-5 w-5 accent-sky-500" />Activo en los canales de venta</label>
     <div className="flex flex-col gap-3 sm:flex-row">
@@ -168,7 +170,7 @@ export function ProductWorkspace() {
 
       {filteredProducts.length === 0 ? <p className="py-10 text-center text-sm font-semibold text-slate-400">No hay productos que coincidan con los filtros actuales.</p> : <ul className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
         {filteredProducts.map((product) => <li key={product.id} className="group flex min-w-0 flex-col overflow-hidden rounded-3xl border border-slate-800 bg-slate-900 p-3 shadow-lg transition-colors hover:border-slate-700 sm:p-4">
-          <CatalogImageTile alt={`Imagen de ${product.name}`} className="mb-4 w-full border-slate-800 bg-slate-950 text-slate-400" imageClassName="transition-transform duration-200 group-hover:scale-105" />
+          <CatalogImageTile src={product.imageUrl} alt={`Imagen de ${product.name}`} className="mb-4 w-full border-slate-800 bg-slate-950 text-slate-400" imageClassName="transition-transform duration-200 group-hover:scale-105" />
           <div className="min-w-0">
             <div className="flex items-start justify-between gap-2">
               <div className="min-w-0">
