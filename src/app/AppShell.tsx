@@ -13,8 +13,8 @@ const modules: Array<{ id: AppModule; label: string; description: string; icon: 
 
 function ModuleNavigation({ activeModule, onModuleChange, mobile = false }: { activeModule: AppModule; onModuleChange: (module: AppModule) => void; mobile?: boolean }) {
   return <nav aria-label={mobile ? 'Mobile module navigation' : 'Desktop module navigation'} className="grid gap-1">
-    {modules.map((module) => <button key={module.id} type="button" aria-label={module.label} aria-current={activeModule === module.id ? 'page' : undefined} onClick={() => onModuleChange(module.id)} className={`ops-focus flex min-h-11 items-center gap-3 rounded-xl px-3 text-left transition-colors ${activeModule === module.id ? 'bg-sky-700 text-white shadow-lg shadow-sky-950/25' : 'text-slate-400 hover:bg-slate-800 hover:text-slate-100'}`}>
-      <Icon name={module.icon} className="h-5 w-5 shrink-0" /><span className="min-w-0"><span className="block text-sm font-semibold">{module.label}</span><span className={`block truncate text-xs ${activeModule === module.id ? 'text-white' : 'text-slate-500'}`}>{module.description}</span></span>
+    {modules.map((module) => <button key={module.id} type="button" aria-label={module.label} aria-current={activeModule === module.id ? 'page' : undefined} onClick={() => onModuleChange(module.id)} className={`ops-focus flex min-h-11 items-center gap-3 rounded-xl px-3 text-left transition-colors ${activeModule === module.id ? 'bg-sky-700 shadow-lg shadow-sky-950/25' : 'hover:bg-slate-800'}`}>
+      <Icon name={module.icon} className={`h-5 w-5 shrink-0 ${activeModule === module.id ? 'text-white' : 'text-slate-300'}`} /><span className="min-w-0"><span className={`block text-sm font-semibold ${activeModule === module.id ? 'text-white' : 'text-slate-300'}`}>{module.label}</span><span className={`block truncate text-xs ${activeModule === module.id ? 'text-sky-100' : 'text-slate-500'}`}>{module.description}</span></span>
     </button>)}
   </nav>
 }

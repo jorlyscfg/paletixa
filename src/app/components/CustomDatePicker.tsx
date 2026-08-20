@@ -73,7 +73,7 @@ export function CustomDatePicker({ value, onChange, className = '', placeholder 
         <button type="button" aria-label="Next month" onClick={() => moveMonth(1)} className="ops-focus inline-flex h-11 w-11 items-center justify-center rounded-lg text-slate-300 hover:bg-slate-800"><Icon name="chevron-right" className="h-4 w-4" /></button>
       </div>
       <div className="mt-3 grid grid-cols-7 gap-1 text-center">{WEEKDAYS.map((day) => <span key={day} className="py-1 text-xs font-medium text-slate-500">{day}</span>)}
-        {cells.map(({ date, current }) => <button key={toValue(date)} type="button" aria-label={date.toLocaleDateString('en-US', { dateStyle: 'long' })} onClick={() => { onChange(toValue(date)); setOpen(false) }} className={`ops-focus inline-flex h-11 w-11 items-center justify-center rounded-lg text-sm ${selected && toValue(selected) === toValue(date) ? 'bg-sky-700 font-semibold text-white' : current ? 'text-slate-200 hover:bg-slate-800' : 'text-slate-600 hover:bg-slate-800/60'}`}>{date.getDate()}</button>)}
+        {cells.map(({ date, current }) => { const isSelected = selected && toValue(selected) === toValue(date); return <button key={toValue(date)} type="button" aria-label={date.toLocaleDateString('en-US', { dateStyle: 'long' })} onClick={() => { onChange(toValue(date)); setOpen(false) }} className={`ops-focus inline-flex h-11 w-11 items-center justify-center rounded-lg text-sm text-white ${isSelected ? 'bg-sky-700 font-semibold' : current ? 'hover:bg-slate-800' : 'opacity-50 hover:bg-slate-800/60'}`}><span>{date.getDate()}</span></button> })}
       </div>
     </div>}
   </div>
