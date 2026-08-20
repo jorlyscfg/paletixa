@@ -11,3 +11,55 @@
     min-height: 100dvh;
   }
 }
+
+@layer components {
+  .ops-shell {
+    --ops-control: #111b2e;
+    --ops-panel: #0f172a;
+    --ops-border: #26334a;
+  }
+
+  .ops-focus:focus-visible {
+    outline: 2px solid #38bdf8;
+    outline-offset: 2px;
+  }
+
+  .ops-action {
+    min-height: 2.75rem;
+    border-radius: 0.75rem;
+    padding: 0.625rem 0.875rem;
+    font-size: 0.875rem;
+    font-weight: 600;
+    transition: background-color 160ms ease, color 160ms ease, opacity 160ms ease;
+  }
+
+  .ops-action:disabled,
+  .ops-control:disabled {
+    cursor: not-allowed;
+    opacity: 0.55;
+  }
+
+  .ops-control {
+    border: 1px solid #cbd5e1;
+    border-radius: 0.75rem;
+    background: white;
+    color: #0f172a;
+  }
+
+  .ops-popover {
+    border: 1px solid var(--ops-border);
+    border-radius: 0.875rem;
+    background: var(--ops-panel);
+    box-shadow: 0 18px 40px rgb(2 6 23 / 0.28);
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .ops-shell *,
+    .ops-shell *::before,
+    .ops-shell *::after {
+      scroll-behavior: auto !important;
+      transition-duration: 0.01ms !important;
+      animation-duration: 0.01ms !important;
+    }
+  }
+}

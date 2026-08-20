@@ -1,5 +1,5 @@
 import { StrictMode } from 'react'
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import App from '../../../App'
 import * as authApi from '../../auth/api/adminAccess'
@@ -17,6 +17,10 @@ const deferred = <T,>() => {
   const promise = new Promise<T>((done) => { resolve = done })
   return { promise, resolve }
 }
+const openBranches = async () => {
+  fireEvent.click(await screen.findByRole('button', { name: 'Open navigation menu' }))
+  fireEvent.click(within(screen.getByRole('dialog', { name: 'Module navigation' })).getByRole('button', { name: /Branches/ }))
+}
 describe('admin branch workspace', () => {
   afterEach(cleanup)
   beforeEach(() => {
@@ -25,6 +29,8 @@ describe('admin branch workspace', () => {
     vi.mocked(branchApi.listBranches).mockResolvedValue([])
     vi.mocked(productApi.listProducts).mockResolvedValue([])
     vi.mocked(salesApi.getSalesByChannel).mockResolvedValue([])
+    let requestSequence = 0
+    vi.stubGlobal('crypto', { randomUUID: vi.fn(() => `request-${++requestSequence}`) })
   })
   it('shows one generic denial and never requests protected data', async () => {
     vi.mocked(authApi.getAdminAccess).mockResolvedValue(false)
@@ -44,6 +50,7 @@ describe('admin branch workspace', () => {
     const load = deferred<branchApi.Branch[]>()
     vi.mocked(branchApi.listBranches).mockReturnValue(load.promise)
     render(<App />)
+    await openBranches()
     expect(await screen.findByText('Loading branches…')).toHaveAttribute('role', 'status')
     load.resolve([])
     expect(await screen.findByText('No branches yet.')).toBeInTheDocument()
@@ -53,6 +60,7 @@ describe('admin branch workspace', () => {
     vi.mocked(branchApi.listBranches).mockReturnValue(load.promise)
     vi.mocked(branchApi.createBranch).mockResolvedValue(branch)
     render(<App />)
+    await openBranches()
     await screen.findByText('Loading branches…')
     fireEvent.change(screen.getByLabelText('Branch name'), { target: { value: 'Central' } })
     fireEvent.submit(screen.getByRole('form', { name: 'Create branch' }))
@@ -66,6 +74,7 @@ describe('admin branch workspace', () => {
     vi.mocked(branchApi.listBranches).mockResolvedValue([branch])
     vi.mocked(branchApi.setBranchStatus).mockReturnValue(status.promise)
     render(<App />)
+    await openBranches()
     fireEvent.click(await screen.findByRole('button', { name: 'Suspend Central' }))
     for (const name of ['Refresh branches', 'Create branch', 'Suspend Central'])
       expect(screen.getByRole('button', { name })).toBeDisabled()
@@ -82,6 +91,7 @@ describe('admin branch workspace', () => {
       .mockReturnValueOnce(newer.promise)
     render(<StrictMode><App /></StrictMode>)
     newer.resolve(true)
+    await openBranches()
     expect(await screen.findByRole('heading', { name: 'Branches' })).toBeInTheDocument()
     older.resolve(false)
     await waitFor(() => expect(screen.queryByRole('heading', { name: 'Access unavailable' })).not.toBeInTheDocument())
@@ -91,6 +101,7 @@ describe('admin branch workspace', () => {
       .mockRejectedValueOnce(new Error('offline'))
       .mockResolvedValueOnce([])
     render(<App />)
+    await openBranches()
     const alert = await screen.findByRole('alert')
     expect(alert).toHaveTextContent('Branches could not be loaded')
     expect(alert).toHaveFocus()
@@ -102,6 +113,7 @@ describe('admin branch workspace', () => {
       .mockRejectedValueOnce(new Error('timeout'))
       .mockResolvedValueOnce(branch)
     render(<App />)
+    await openBranches()
     await screen.findByText('No branches yet.')
     fireEvent.change(screen.getByLabelText('Branch name'), { target: { value: 'Central' } })
     fireEvent.submit(screen.getByRole('form', { name: 'Create branch' }))
@@ -114,6 +126,7 @@ describe('admin branch workspace', () => {
   it('uses a new request ID for a divergent create intent', async () => {
     vi.mocked(branchApi.createBranch).mockRejectedValue(new Error('conflict'))
     render(<App />)
+    await openBranches()
     await screen.findByText('No branches yet.')
     const input = screen.getByLabelText('Branch name')
     fireEvent.change(input, { target: { value: 'Central' } }); fireEvent.submit(screen.getByRole('form', { name: 'Create branch' }))
@@ -129,6 +142,7 @@ describe('admin branch workspace', () => {
       .mockRejectedValueOnce(new Error('timeout'))
       .mockResolvedValueOnce({ ...branch, status: 'suspended' })
     render(<App />)
+    await openBranches()
     fireEvent.click(await screen.findByRole('button', { name: 'Suspend Central' }))
     await screen.findByText('The branch status was not changed.')
     fireEvent.click(screen.getByRole('button', { name: 'Retry status change' }))
@@ -139,6 +153,7 @@ describe('admin branch workspace', () => {
   it('ignores stale branch responses', async () => {
     vi.mocked(branchApi.listBranches).mockResolvedValueOnce([branch])
     render(<App />)
+    await openBranches()
     await screen.findByText('Central')
     const older = deferred<branchApi.Branch[]>()
     const newer = deferred<branchApi.Branch[]>()
