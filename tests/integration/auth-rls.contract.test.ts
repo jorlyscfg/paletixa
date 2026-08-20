@@ -7,8 +7,15 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 const exec = promisify(execFile)
 const validationBranch = 'admin-branch-access-foundation-validation'
 const ids = {
-  admin: '10000000-0000-0000-0000-000000000001', other: '10000000-0000-0000-0000-000000000002',
-  inactive: '10000000-0000-0000-0000-000000000003', unverified: '10000000-0000-0000-0000-000000000004',
+  admin: '20000000-0000-0000-0000-000000000001', other: '20000000-0000-0000-0000-000000000002',
+  inactive: '20000000-0000-0000-0000-000000000003', unverified: '20000000-0000-0000-0000-000000000004',
+}
+const runId = crypto.randomUUID()
+const emails = {
+  admin: `auth-rls-admin-${runId}@example.invalid`,
+  other: `auth-rls-other-${runId}@example.invalid`,
+  inactive: `auth-rls-inactive-${runId}@example.invalid`,
+  unverified: `auth-rls-unverified-${runId}@example.invalid`,
 }
 const clients = {} as Record<keyof typeof ids, InsForgeClient>
 const repeatable = process.env.AUTH_RLS_REPEATABLE === '1'
@@ -58,17 +65,17 @@ beforeAll(async () => {
   }
   await query(`
     insert into auth.users(id,email,password,email_verified) values
-      ('${ids.admin}','admin@example.invalid',crypt('${password}',gen_salt('bf')),true),
-      ('${ids.other}','other@example.invalid',crypt('${password}',gen_salt('bf')),true),
-      ('${ids.inactive}','inactive@example.invalid',crypt('${password}',gen_salt('bf')),true),
-      ('${ids.unverified}','unverified@example.invalid',crypt('${password}',gen_salt('bf')),true)
-    on conflict(id) do update set password=excluded.password,email_verified=true;
+      ('${ids.admin}','${emails.admin}',crypt('${password}',gen_salt('bf')),true),
+      ('${ids.other}','${emails.other}',crypt('${password}',gen_salt('bf')),true),
+      ('${ids.inactive}','${emails.inactive}',crypt('${password}',gen_salt('bf')),true),
+      ('${ids.unverified}','${emails.unverified}',crypt('${password}',gen_salt('bf')),true)
+    on conflict(id) do update set email=excluded.email,password=excluded.password,email_verified=true;
     insert into public.profiles(user_id,is_active) values
       ('${ids.admin}',true),('${ids.other}',true),('${ids.inactive}',false),('${ids.unverified}',true)
     on conflict(user_id) do update set is_active=excluded.is_active`)
   for (const [key, id] of Object.entries(ids) as [keyof typeof ids, string][]) {
     const auth = createClient({ baseUrl })
-    const session = await data(auth.auth.signInWithPassword({ email: `${key}@example.invalid`, password }))
+    const session = await data(auth.auth.signInWithPassword({ email: emails[key], password }))
     clients[key] = createClient({ baseUrl, accessToken: session!.accessToken! })
     expect(session!.user.id).toBe(id)
   }
