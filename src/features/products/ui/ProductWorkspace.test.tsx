@@ -33,6 +33,29 @@ describe('admin product workspace', () => {
     expect(await screen.findByText('No products yet. Add the first product to start the shared catalog.')).toBeInTheDocument()
   })
 
+  it('filters catalog cards by search terms and category', async () => {
+    const strawberry: productApi.Product = { ...product, id: 'product-2', name: 'Strawberry', sku: 'S-02', category: 'Ice cream', active: false }
+    vi.mocked(productApi.listProducts).mockResolvedValue([product, strawberry])
+    renderProtected()
+
+    expect(await screen.findByRole('heading', { name: 'Mango' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Strawberry' })).toBeInTheDocument()
+    expect(screen.getByRole('img', { name: 'Mango product image' })).toBeInTheDocument()
+    expect(screen.getAllByText('$42.50 MXN')).toHaveLength(2)
+    expect(screen.getAllByText('$35.00 MXN')).toHaveLength(2)
+    expect(screen.getByText('Inactive')).toBeInTheDocument()
+
+    const search = screen.getByRole('searchbox', { name: 'Search products' })
+    fireEvent.change(search, { target: { value: 'straw' } })
+    expect(screen.getByRole('heading', { name: 'Strawberry' })).toBeInTheDocument()
+    expect(screen.queryByRole('heading', { name: 'Mango' })).not.toBeInTheDocument()
+
+    fireEvent.change(search, { target: { value: '' } })
+    fireEvent.click(screen.getByRole('tab', { name: 'Filter by Ice cream' }))
+    expect(screen.getByRole('heading', { name: 'Strawberry' })).toBeInTheDocument()
+    expect(screen.queryByRole('heading', { name: 'Mango' })).not.toBeInTheDocument()
+  })
+
   it('creates a product from the catalog form', async () => {
     vi.mocked(productApi.createProduct).mockResolvedValue(product)
     renderProtected(); await screen.findByText('No products yet. Add the first product to start the shared catalog.')
@@ -44,8 +67,8 @@ describe('admin product workspace', () => {
   it('updates and deactivates an existing product', async () => {
     vi.mocked(productApi.listProducts).mockResolvedValue([product]); vi.mocked(productApi.updateProduct).mockResolvedValue({ ...product, name: 'Mango Grande' }); vi.mocked(productApi.deactivateProduct).mockResolvedValue({ ...product, active: false })
     renderProtected(); await screen.findByRole('heading', { name: 'Mango' })
-    fireEvent.click(screen.getByRole('button', { name: 'Edit' })); fireEvent.change(screen.getByLabelText('Name'), { target: { value: 'Mango Grande' } }); fireEvent.submit(screen.getByRole('form', { name: 'Edit Mango' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Edit Mango' })); fireEvent.change(screen.getByLabelText('Name'), { target: { value: 'Mango Grande' } }); fireEvent.submit(screen.getByRole('form', { name: 'Edit Mango' }))
     expect(await screen.findByText('Product updated.')).toBeInTheDocument(); expect(productApi.updateProduct).toHaveBeenCalledWith('product-1', expect.objectContaining({ name: 'Mango Grande' }))
-    fireEvent.click(screen.getByRole('button', { name: 'Deactivate' })); expect(await screen.findByText('Product deactivated.')).toBeInTheDocument(); expect(productApi.deactivateProduct).toHaveBeenCalledWith('product-1')
+    fireEvent.click(screen.getByRole('button', { name: 'Deactivate Mango Grande' })); expect(await screen.findByText('Product deactivated.')).toBeInTheDocument(); expect(productApi.deactivateProduct).toHaveBeenCalledWith('product-1')
   })
 })
