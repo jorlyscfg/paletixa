@@ -26,14 +26,14 @@ describe('product category manager modal', () => {
     vi.mocked(categoryApi.deleteProductCategory).mockResolvedValue()
     render(<ProductCategoryManagerModal categories={[category]} onClose={onClose} onChanged={onChanged} />)
 
-    fireEvent.change(screen.getByLabelText('Nueva categoría'), { target: { value: 'Helados' } })
+    fireEvent.change(screen.getByLabelText('Nueva categoría'), { target: { value: 'pALEtas' } })
     fireEvent.submit(screen.getByRole('form', { name: 'Crear categoría' }))
     expect(await screen.findByText('Helados')).toBeInTheDocument()
-    expect(categoryApi.createProductCategory).toHaveBeenCalledWith('Helados')
+    expect(categoryApi.createProductCategory).toHaveBeenCalledWith('Paletas')
     expect(onChanged).toHaveBeenCalledWith(created, 'created')
 
     fireEvent.click(screen.getByRole('button', { name: 'Renombrar categoría Paletas' }))
-    fireEvent.change(screen.getByLabelText('Nombre de la categoría'), { target: { value: 'Paletas grandes' } })
+    fireEvent.change(screen.getByLabelText('Nombre de la categoría'), { target: { value: 'pALEtas  GRANDES' } })
     fireEvent.submit(screen.getByRole('form', { name: 'Renombrar Paletas' }))
     expect(await screen.findByText('Paletas grandes')).toBeInTheDocument()
     expect(categoryApi.updateProductCategory).toHaveBeenCalledWith('category-1', 'Paletas grandes')

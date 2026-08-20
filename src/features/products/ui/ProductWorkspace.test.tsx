@@ -2,6 +2,7 @@ import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { AdminBoundary } from '../../auth/ui/AdminBoundary'
 import * as authApi from '../../auth/api/adminAccess'
+import { normalizeCapitalizedText } from '../../../lib/textNormalization'
 import * as categoryApi from '../api/productCategories'
 import * as tagApi from '../api/productTags'
 import * as productApi from '../api/products'
@@ -26,7 +27,7 @@ vi.mock('../api/products', () => ({
   normalizeProductTags: (value: unknown) => {
     if (!Array.isArray(value)) return []
     const seen = new Set<string>()
-    return value.map((tag) => String(tag).trim().replace(/\s+/g, ' ')).filter((tag) => tag !== '' && !seen.has(tag.toLocaleLowerCase()) && seen.add(tag.toLocaleLowerCase()))
+    return value.map((tag) => normalizeCapitalizedText(String(tag))).filter((tag) => tag !== '' && !seen.has(tag.toLocaleLowerCase()) && seen.add(tag.toLocaleLowerCase()))
   },
   MAX_PRODUCT_TAG_LENGTH: 48,
   MAX_PRODUCT_TAGS: 20,
@@ -107,7 +108,7 @@ describe('admin product workspace', () => {
     expect(screen.queryByRole('listbox', { name: 'Categorías disponibles' })).not.toBeInTheDocument()
     fireEvent.change(categoryInput, { target: { value: '  pal   ' } })
     expect(screen.getByRole('listbox', { name: 'Categorías disponibles' })).toBeInTheDocument()
-    expect(screen.getByRole('option', { name: 'Paletas' })).toBeInTheDocument()
+    expect(screen.getByRole('option', { name: 'Paletas' })).toHaveClass('h-11', 'min-h-11')
     fireEvent.keyDown(categoryInput, { key: 'ArrowDown' })
     fireEvent.keyDown(categoryInput, { key: 'Enter' })
     expect(categoryInput).toHaveValue('Paletas')
@@ -139,9 +140,9 @@ describe('admin product workspace', () => {
     fireEvent.keyDown(tagInput, { key: 'ArrowDown' }); fireEvent.keyDown(tagInput, { key: 'Enter' })
     expect(screen.getByLabelText('Etiquetas seleccionadas')).toHaveTextContent('Mango')
 
-    fireEvent.change(tagInput, { target: { value: '  Nuevo   tag  ' } })
+    fireEvent.change(tagInput, { target: { value: 'mANGO  CON   CHILE' } })
     fireEvent.keyDown(tagInput, { key: 'Enter' })
-    expect(screen.getByLabelText('Etiquetas seleccionadas')).toHaveTextContent('Nuevo tag')
+    expect(screen.getByLabelText('Etiquetas seleccionadas')).toHaveTextContent('Mango con chile')
     expect(screen.getByLabelText('Etiquetas seleccionadas').querySelectorAll('li')).toHaveLength(2)
     fireEvent.blur(tagInput)
     expect(screen.queryByRole('listbox', { name: 'Etiquetas disponibles' })).not.toBeInTheDocument()
@@ -150,12 +151,13 @@ describe('admin product workspace', () => {
   it('keeps product text controls and autocomplete actions at the 44px minimum', async () => {
     renderProtected(); await screen.findByText('Aún no hay productos. Agrega el primero para iniciar el catálogo compartido.')
     fireEvent.click(screen.getByRole('button', { name: 'Agregar producto' }))
-    expect(screen.getByLabelText('Nombre')).toHaveClass('min-h-11')
-    expect(screen.getByLabelText('Categoría')).toHaveClass('min-h-11')
-    expect(screen.getByRole('button', { name: 'Administrar categorías' })).toHaveClass('min-h-11')
-    expect(screen.getByRole('button', { name: 'Administrar categorías' })).not.toHaveClass('border')
-    expect(screen.getByLabelText('Etiquetas')).toHaveClass('min-h-11')
-    expect(screen.getByRole('button', { name: 'Agregar etiqueta' })).toHaveClass('min-h-11')
+    for (const label of ['Nombre', 'SKU / código', 'Categoría', 'Precio de menudeo (MXN)', 'Precio mayorista (MXN)', 'Etiquetas']) {
+      expect(screen.getByLabelText(label)).toHaveClass('h-11', 'min-h-11')
+    }
+    const categoryButton = screen.getByRole('button', { name: 'Administrar categorías' })
+    expect(categoryButton).toHaveClass('h-11', 'min-h-11', 'min-w-11', 'border-0', 'bg-transparent', 'hover:bg-transparent')
+    expect(categoryButton).not.toHaveClass('border', 'bg-slate-900', 'hover:bg-slate-800')
+    expect(screen.getByRole('button', { name: 'Agregar etiqueta' })).toHaveClass('h-11', 'min-h-11')
   })
 
   it('opens the category manager as a sibling modal and closes only the top layer with Escape', async () => {
@@ -204,16 +206,16 @@ describe('admin product workspace', () => {
     vi.mocked(productApi.createProduct).mockResolvedValue(product)
     renderProtected(); await screen.findByText('Aún no hay productos. Agrega el primero para iniciar el catálogo compartido.')
     fireEvent.click(screen.getByRole('button', { name: 'Agregar producto' }))
-    fireEvent.change(screen.getByLabelText('Nombre'), { target: { value: 'Mango' } }); fireEvent.change(screen.getByLabelText('SKU / código'), { target: { value: 'M-01' } }); fireEvent.focus(screen.getByLabelText('Categoría')); fireEvent.change(screen.getByLabelText('Categoría'), { target: { value: 'pal' } }); fireEvent.click(screen.getByRole('option', { name: 'Paletas' })); fireEvent.change(screen.getByLabelText('Precio de menudeo (MXN)'), { target: { value: '42.5' } }); fireEvent.change(screen.getByLabelText('Precio mayorista (MXN)'), { target: { value: '35' } }); fireEvent.change(screen.getByLabelText('Etiquetas'), { target: { value: 'fruta' } }); fireEvent.keyDown(screen.getByLabelText('Etiquetas'), { key: 'Enter' })
+    fireEvent.change(screen.getByLabelText('Nombre'), { target: { value: 'nIEVE  dE  fRESA' } }); fireEvent.change(screen.getByLabelText('SKU / código'), { target: { value: 'SKU-01' } }); fireEvent.focus(screen.getByLabelText('Categoría')); fireEvent.change(screen.getByLabelText('Categoría'), { target: { value: 'pal' } }); fireEvent.click(screen.getByRole('option', { name: 'Paletas' })); fireEvent.change(screen.getByLabelText('Precio de menudeo (MXN)'), { target: { value: '42.5' } }); fireEvent.change(screen.getByLabelText('Precio mayorista (MXN)'), { target: { value: '35' } }); fireEvent.change(screen.getByLabelText('Etiquetas'), { target: { value: 'fruta' } }); fireEvent.keyDown(screen.getByLabelText('Etiquetas'), { key: 'Enter' })
     fireEvent.submit(screen.getByRole('form', { name: 'Crear producto' }))
-    expect(await screen.findByText('Producto creado.')).toBeInTheDocument(); expect(screen.queryByRole('dialog')).not.toBeInTheDocument(); expect(productApi.createProduct).toHaveBeenCalledWith({ name: 'Mango', sku: 'M-01', categoryId: 'category-1', retailPriceMxn: 42.5, wholesalePriceMxn: 35, tags: ['fruta'], active: true })
+    expect(await screen.findByText('Producto creado.')).toBeInTheDocument(); expect(screen.queryByRole('dialog')).not.toBeInTheDocument(); expect(productApi.createProduct).toHaveBeenCalledWith({ name: 'Nieve de fresa', sku: 'Sku-01', categoryId: 'category-1', retailPriceMxn: 42.5, wholesalePriceMxn: 35, tags: ['Fruta'], active: true })
   })
 
   it('updates and deactivates an existing product', async () => {
     vi.mocked(productApi.listProducts).mockResolvedValue([product]); vi.mocked(productApi.updateProduct).mockResolvedValue({ ...product, name: 'Mango Grande' }); vi.mocked(productApi.deactivateProduct).mockResolvedValue({ ...product, active: false })
     renderProtected(); await screen.findByRole('heading', { name: 'Mango' })
-    fireEvent.click(screen.getByRole('button', { name: 'Editar Mango' })); expect(screen.getByRole('dialog', { name: 'Editar producto' })).toBeInTheDocument(); expect(screen.getByRole('heading', { name: 'Editar producto' })).toBeInTheDocument(); fireEvent.change(screen.getByLabelText('Nombre'), { target: { value: 'Mango Grande' } }); fireEvent.submit(screen.getByRole('form', { name: 'Editar Mango' }))
-    expect(await screen.findByText('Producto actualizado.')).toBeInTheDocument(); expect(screen.queryByRole('dialog')).not.toBeInTheDocument(); expect(productApi.updateProduct).toHaveBeenCalledWith('product-1', expect.objectContaining({ name: 'Mango Grande' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Editar Mango' })); expect(screen.getByRole('dialog', { name: 'Editar producto' })).toBeInTheDocument(); expect(screen.getByRole('heading', { name: 'Editar producto' })).toBeInTheDocument(); fireEvent.change(screen.getByLabelText('Nombre'), { target: { value: 'mANGO  GRANDE' } }); fireEvent.submit(screen.getByRole('form', { name: 'Editar Mango' }))
+    expect(await screen.findByText('Producto actualizado.')).toBeInTheDocument(); expect(screen.queryByRole('dialog')).not.toBeInTheDocument(); expect(productApi.updateProduct).toHaveBeenCalledWith('product-1', expect.objectContaining({ name: 'Mango grande' }))
     fireEvent.click(screen.getByRole('button', { name: 'Desactivar Mango Grande' })); expect(await screen.findByText('Producto desactivado.')).toBeInTheDocument(); expect(productApi.deactivateProduct).toHaveBeenCalledWith('product-1')
   })
 

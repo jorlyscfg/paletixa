@@ -18,9 +18,9 @@ const row = { id: 'category-1', name: 'Paletas con chile', normalized_name: 'pal
 describe('product category API', () => {
   beforeEach(() => vi.resetAllMocks())
 
-  it('canonicalizes display names and identities by trimming and collapsing whitespace', () => {
-    expect(normalizeProductCategoryName('  Paletas   con   chile  ')).toBe('Paletas con chile')
-    expect(normalizeProductCategoryIdentity('  Paletas   CON chile  ')).toBe('paletas con chile')
+  it('normalizes display names and keeps lowercase identities', () => {
+    expect(normalizeProductCategoryName('  pALEtas   CON   CHILE  ')).toBe('Paletas con chile')
+    expect(normalizeProductCategoryIdentity('  pALEtas   CON chile  ')).toBe('paletas con chile')
     expect(() => normalizeProductCategoryName('   ')).toThrow('Category name is required')
   })
 
@@ -41,7 +41,7 @@ describe('product category API', () => {
     sdk.database.from.mockReturnValue(insertQuery)
     insertQuery.insert.mockReturnValue(insertQuery)
     insertQuery.select.mockResolvedValue({ data: [row], error: null })
-    await createProductCategory('  Paletas   con chile ')
+    await createProductCategory('  pALEtas   CON   CHILE ')
     expect(insertQuery.insert).toHaveBeenCalledWith([{ name: 'Paletas con chile' }])
 
     const updateQuery = { update: vi.fn(), eq: vi.fn(), select: vi.fn() }
@@ -49,7 +49,7 @@ describe('product category API', () => {
     updateQuery.update.mockReturnValue(updateQuery)
     updateQuery.eq.mockReturnValue(updateQuery)
     updateQuery.select.mockResolvedValue({ data: [row], error: null })
-    await updateProductCategory(' category-1 ', ' Helados   cremosos ')
+    await updateProductCategory(' category-1 ', ' hELADOS   CREMOSOS ')
     expect(updateQuery.update).toHaveBeenCalledWith({ name: 'Helados cremosos' })
     expect(updateQuery.eq).toHaveBeenCalledWith('id', 'category-1')
   })

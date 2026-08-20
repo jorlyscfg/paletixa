@@ -19,7 +19,7 @@ describe('product catalog API', () => {
   it('lists only the catalog projection and maps MXN prices to numbers', async () => {
     const query = { select: vi.fn(), order: vi.fn() }
     sdk.database.from.mockReturnValue(query); query.select.mockReturnValue(query); query.order.mockResolvedValue({ data: [row], error: null })
-    await expect(listProducts()).resolves.toEqual([{ id: 'product-1', name: 'Mango', sku: ' M-01 ', category: 'Paletas', categoryId: 'category-1', retailPriceMxn: 42.5, wholesalePriceMxn: 35, active: true, tags: ['sabor', 'fruta'], imageUrl: row.image_url, imageKey: row.image_key, createdAt: row.created_at, updatedAt: row.updated_at }])
+    await expect(listProducts()).resolves.toEqual([{ id: 'product-1', name: 'Mango', sku: 'M-01', category: 'Paletas', categoryId: 'category-1', retailPriceMxn: 42.5, wholesalePriceMxn: 35, active: true, tags: ['Sabor', 'Fruta'], imageUrl: row.image_url, imageKey: row.image_key, createdAt: row.created_at, updatedAt: row.updated_at }])
     expect(query.select).toHaveBeenCalledWith('id, name, sku, category_id, category:product_categories(id, name), retail_price_mxn, wholesale_price_mxn, active, tag_assignments:product_tag_assignments(tag:product_tags(name)), image_url, image_key, created_at, updated_at')
   })
 
@@ -29,9 +29,9 @@ describe('product catalog API', () => {
     sdk.database.from.mockReturnValueOnce(insertQuery).mockReturnValueOnce(readQuery)
     insertQuery.insert.mockReturnValue(insertQuery); insertQuery.select.mockResolvedValue({ data: [row], error: null })
     readQuery.select.mockReturnValue(readQuery); readQuery.eq.mockResolvedValue({ data: [row], error: null }); sdk.database.rpc.mockResolvedValue({ data: null, error: null })
-    await createProduct({ name: ' Mango ', sku: 'M-01', categoryId: ' category-1 ', retailPriceMxn: 42.499, wholesalePriceMxn: 35, tags: [' sabor ', 'SABOR', ' fruta '] })
-    expect(insertQuery.insert).toHaveBeenCalledWith([{ name: 'Mango', sku: 'M-01', category_id: 'category-1', retail_price_mxn: 42.5, wholesale_price_mxn: 35, active: true }])
-    expect(sdk.database.rpc).toHaveBeenCalledWith('sync_product_tags', { p_product_id: 'product-1', p_tags: ['sabor', 'fruta'] })
+    await createProduct({ name: ' nIEVE  dE  fRESA ', sku: 'SKU-01', categoryId: ' category-1 ', retailPriceMxn: 42.499, wholesalePriceMxn: 35, tags: [' mANGO  CON   CHILE ', 'MANGO CON CHILE', ' fruta '] })
+    expect(insertQuery.insert).toHaveBeenCalledWith([{ name: 'Nieve de fresa', sku: 'Sku-01', category_id: 'category-1', retail_price_mxn: 42.5, wholesale_price_mxn: 35, active: true }])
+    expect(sdk.database.rpc).toHaveBeenCalledWith('sync_product_tags', { p_product_id: 'product-1', p_tags: ['Mango con chile', 'Fruta'] })
     expect(readQuery.eq).toHaveBeenCalledWith('id', 'product-1')
   })
 
@@ -41,9 +41,9 @@ describe('product catalog API', () => {
     sdk.database.from.mockReturnValueOnce(updateQuery).mockReturnValueOnce(readQuery)
     updateQuery.update.mockReturnValue(updateQuery); updateQuery.eq.mockReturnValue(updateQuery); updateQuery.select.mockResolvedValue({ data: [row], error: null })
     readQuery.select.mockReturnValue(readQuery); readQuery.eq.mockResolvedValue({ data: [row], error: null }); sdk.database.rpc.mockResolvedValue({ data: null, error: null })
-    await updateProduct('product-1', { name: 'Mango Grande', categoryId: ' category-2 ', retailPriceMxn: 50, tags: [' con chile ', 'CON CHILE'] })
-    expect(updateQuery.update).toHaveBeenCalledWith({ name: 'Mango Grande', category_id: 'category-2', retail_price_mxn: 50 }); expect(updateQuery.eq).toHaveBeenCalledWith('id', 'product-1')
-    expect(sdk.database.rpc).toHaveBeenCalledWith('sync_product_tags', { p_product_id: 'product-1', p_tags: ['con chile'] })
+    await updateProduct('product-1', { name: 'nIEVE  dE  fRESA', sku: 'SKU-01', categoryId: ' category-2 ', retailPriceMxn: 50, tags: [' mANGO  CON   CHILE ', 'MANGO CON CHILE'] })
+    expect(updateQuery.update).toHaveBeenCalledWith({ name: 'Nieve de fresa', sku: 'Sku-01', category_id: 'category-2', retail_price_mxn: 50 }); expect(updateQuery.eq).toHaveBeenCalledWith('id', 'product-1')
+    expect(sdk.database.rpc).toHaveBeenCalledWith('sync_product_tags', { p_product_id: 'product-1', p_tags: ['Mango con chile'] })
   })
 
   it('clears all tag assignments when updating with an empty tag list', async () => {

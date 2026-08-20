@@ -1,4 +1,5 @@
 import { insforge } from '../../../lib/insforge'
+import { normalizeCapitalizedText } from '../../../lib/textNormalization'
 
 const PRODUCT_CATEGORY_COLUMNS = 'id, name, normalized_name, created_at, updated_at'
 export const PRODUCT_CATEGORY_MAX_LENGTH = 120
@@ -21,7 +22,7 @@ type ProductCategoryRow = {
 
 export function normalizeProductCategoryName(value: unknown, field = 'Category name') {
   if (typeof value !== 'string') throw new Error(`${field} is required`)
-  const normalized = value.trim().replace(/\s+/g, ' ')
+  const normalized = normalizeCapitalizedText(value)
   if (normalized === '') throw new Error(`${field} is required`)
   if (normalized.length > PRODUCT_CATEGORY_MAX_LENGTH) {
     throw new Error(`${field} cannot exceed ${PRODUCT_CATEGORY_MAX_LENGTH} characters`)
@@ -43,7 +44,7 @@ function mapProductCategory(data: unknown): ProductCategory {
   if (!row) throw new Error('Category response was empty')
   return {
     id: row.id,
-    name: row.name,
+    name: normalizeProductCategoryName(row.name),
     normalizedName: row.normalized_name,
     createdAt: row.created_at,
     updatedAt: row.updated_at,

@@ -2,6 +2,7 @@ import { type ChangeEvent, type FormEvent, useCallback, useEffect, useId, useRef
 import { CatalogImageTile } from '../../../app/components/CatalogImageTile'
 import { ResponsiveActionButton } from '../../../app/components/ResponsiveActionButton'
 import { SearchInput } from '../../../app/components/SearchInput'
+import { normalizeCapitalizedText } from '../../../lib/textNormalization'
 import { listProductCategories, type ProductCategory } from '../api/productCategories'
 import { listProductTags, type ProductTag } from '../api/productTags'
 import {
@@ -168,8 +169,8 @@ function ProductForm({
     }
     const values = new FormData(event.currentTarget)
     onSubmit({
-      name: String(values.get('name') ?? ''),
-      sku: String(values.get('sku') ?? ''),
+      name: normalizeCapitalizedText(String(values.get('name') ?? '')),
+      sku: normalizeCapitalizedText(String(values.get('sku') ?? '')),
       categoryId,
       retailPriceMxn: Number(values.get('retailPriceMxn')),
       wholesalePriceMxn: Number(values.get('wholesalePriceMxn')),
@@ -180,8 +181,8 @@ function ProductForm({
     })
   }
 
-  const inputClassName = 'ops-control ops-focus min-h-11 w-full px-3 text-sm font-medium placeholder:text-slate-500'
-  const imageActionClassName = 'inline-flex min-h-11 items-center justify-center rounded-xl border border-slate-700 bg-slate-900 px-3 text-sm font-bold text-slate-200 transition-colors hover:border-sky-500 hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400 disabled:pointer-events-none disabled:opacity-50'
+  const inputClassName = 'ops-control ops-focus h-11 min-h-11 w-full px-3 text-sm font-medium placeholder:text-slate-500'
+  const imageActionClassName = 'inline-flex h-11 min-h-11 items-center justify-center rounded-xl border border-slate-700 bg-slate-900 px-3 text-sm font-bold text-slate-200 transition-colors hover:border-sky-500 hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400 disabled:pointer-events-none disabled:opacity-50'
   const categoryMatches = categoryInput.trim() === '' ? [] : categories.filter(({ name }) => normalizeCategoryFilter(name).includes(normalizeCategoryFilter(categoryInput)))
   const tagMatches = tagInput.trim() === '' ? [] : tagSuggestions.filter((tag) => !tags.some((selectedTag) => normalizeCategoryFilter(selectedTag) === normalizeCategoryFilter(tag)) && normalizeCategoryFilter(tag).includes(normalizeCategoryFilter(tagInput)))
   const categorySuggestionsVisible = categoryFocused && categoryOpen && categoryInput.trim() !== ''
@@ -191,9 +192,9 @@ function ProductForm({
 
   return <form key={product?.id ?? 'new'} aria-label={product ? `Editar ${product.name}` : 'Crear producto'} className="grid gap-5 rounded-3xl border border-slate-800 bg-slate-950 p-4 shadow-xl sm:p-6" onSubmit={submit}>
     <div className="grid gap-4 sm:grid-cols-2">
-      <label className="grid gap-2 text-sm font-semibold text-slate-300">Nombre<input required maxLength={160} name="name" defaultValue={initial.name} className={inputClassName} /></label>
-      <label className="grid gap-2 text-sm font-semibold text-slate-300">SKU / código<input required maxLength={80} name="sku" defaultValue={initial.sku} className={inputClassName} /></label>
-      <div className="relative grid gap-2 text-sm font-semibold text-slate-300">
+      <label className="grid content-start gap-2 text-sm font-semibold text-slate-300">Nombre<input required maxLength={160} name="name" defaultValue={initial.name} className={inputClassName} /></label>
+      <label className="grid content-start gap-2 text-sm font-semibold text-slate-300">SKU / código<input required maxLength={80} name="sku" defaultValue={initial.sku} className={inputClassName} /></label>
+      <div className="relative grid content-start gap-2 text-sm font-semibold text-slate-300">
         <label htmlFor="product-category">Categoría</label>
         <div className="relative">
           <input id="product-category" required maxLength={120} name="category" value={categoryInput} autoComplete="off" role="combobox" aria-autocomplete="list" aria-controls={categoryListId} aria-expanded={categorySuggestionsVisible} aria-activedescendant={categorySuggestionsVisible && categoryMatches[activeCategoryIndex] ? `product-category-option-${categoryMatches[activeCategoryIndex].id}` : undefined} aria-describedby="product-category-help product-category-error" className={`${inputClassName} pr-14`} onFocus={() => { setCategoryFocused(true); setCategoryOpen(categoryInput.trim() !== '') }} onBlur={() => { setCategoryFocused(false); setCategoryOpen(false) }} onChange={(event) => { setCategoryInput(event.target.value); setCategoryId(''); setCategoryError(''); setActiveCategoryIndex(0); setCategoryOpen(event.target.value.trim() !== '') }} onKeyDown={(event) => {
@@ -215,17 +216,17 @@ function ProductForm({
               setCategoryOpen(false)
             }
           }} />
-          <button type="button" aria-label="Administrar categorías" title="Administrar categorías" disabled={busy} className="ops-focus absolute right-1 top-1/2 inline-flex min-h-11 min-w-11 -translate-y-1/2 items-center justify-center rounded-lg bg-slate-900 text-lg font-bold text-slate-200 hover:bg-slate-800 focus-visible:ring-2 focus-visible:ring-sky-400 disabled:pointer-events-none disabled:opacity-50" onClick={onManageCategories}>+</button>
+          <button type="button" aria-label="Administrar categorías" title="Administrar categorías" disabled={busy} className="ops-focus absolute right-1 top-1/2 inline-flex h-11 min-h-11 min-w-11 -translate-y-1/2 items-center justify-center rounded-lg border-0 bg-transparent text-lg font-bold text-slate-200 hover:bg-transparent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400 disabled:pointer-events-none disabled:opacity-50" onClick={onManageCategories}>+</button>
           {categorySuggestionsVisible && <ul id={categoryListId} role="listbox" aria-label="Categorías disponibles" className="absolute left-0 right-0 top-full z-30 mt-1 max-h-48 overflow-y-auto rounded-xl border border-slate-700 bg-slate-900 p-1 shadow-2xl">
-            {categoryMatches.length > 0 ? categoryMatches.map((category, index) => <li id={`product-category-option-${category.id}`} key={category.id} role="option" aria-selected={category.id === categoryId} className={`flex min-h-11 cursor-pointer items-center rounded-lg px-3 py-2 text-sm font-semibold ${index === activeCategoryIndex ? 'bg-sky-500/15 text-white' : 'text-white/80 hover:bg-slate-800 hover:text-white'}`} onMouseDown={(event) => event.preventDefault()} onClick={() => { setCategoryInput(category.name); setCategoryId(category.id); setCategoryError(''); setCategoryOpen(false) }}>{category.name}</li>) : <li className="flex min-h-11 items-center px-3 py-2 text-sm font-normal text-white/60">No hay categorías que coincidan.</li>}
+            {categoryMatches.length > 0 ? categoryMatches.map((category, index) => <li id={`product-category-option-${category.id}`} key={category.id} role="option" aria-selected={category.id === categoryId} className={`flex h-11 min-h-11 cursor-pointer items-center rounded-lg px-3 py-2 text-sm font-semibold ${index === activeCategoryIndex ? 'bg-sky-500/15 text-white' : 'text-white/80 hover:bg-slate-800 hover:text-white'}`} onMouseDown={(event) => event.preventDefault()} onClick={() => { setCategoryInput(category.name); setCategoryId(category.id); setCategoryError(''); setCategoryOpen(false) }}>{category.name}</li>) : <li className="flex h-11 min-h-11 items-center px-3 py-2 text-sm font-normal text-white/60">No hay categorías que coincidan.</li>}
           </ul>}
         </div>
         <p id="product-category-help" className="text-xs font-normal leading-relaxed text-slate-500">Escribe para filtrar y selecciona una categoría existente.</p>
         {categoryError && <p id="product-category-error" role="alert" className="text-xs font-semibold text-rose-300">{categoryError}</p>}
       </div>
-      <label className="grid gap-2 text-sm font-semibold text-slate-300">Precio de menudeo (MXN)<input required min="0" step="0.01" name="retailPriceMxn" type="number" defaultValue={initial.retailPriceMxn} className={inputClassName} /></label>
-      <label className="grid gap-2 text-sm font-semibold text-slate-300">Precio mayorista (MXN)<input required min="0" step="0.01" name="wholesalePriceMxn" type="number" defaultValue={initial.wholesalePriceMxn} className={inputClassName} /></label>
-      <div className="grid gap-2 sm:col-span-2">
+      <label className="grid content-start gap-2 text-sm font-semibold text-slate-300">Precio de menudeo (MXN)<input required min="0" step="0.01" name="retailPriceMxn" type="number" defaultValue={initial.retailPriceMxn} className={inputClassName} /></label>
+      <label className="grid content-start gap-2 text-sm font-semibold text-slate-300">Precio mayorista (MXN)<input required min="0" step="0.01" name="wholesalePriceMxn" type="number" defaultValue={initial.wholesalePriceMxn} className={inputClassName} /></label>
+      <div className="grid content-start gap-2 sm:col-span-2">
         <label htmlFor="product-tags" className="text-sm font-semibold text-slate-300">Etiquetas</label>
         <div className="flex flex-col gap-2 sm:flex-row">
           <div className="relative min-w-0 sm:flex-1">
@@ -248,10 +249,10 @@ function ProductForm({
               }
             }} aria-describedby="product-tags-help product-tags-error" />
             {tagSuggestionsVisible && <ul id={tagListId} role="listbox" aria-label="Etiquetas disponibles" className="absolute left-0 right-0 top-full z-30 mt-1 max-h-48 overflow-y-auto rounded-xl border border-slate-700 bg-slate-900 p-1 shadow-2xl">
-              {tagMatches.length > 0 ? tagMatches.map((tag, index) => <li id={`product-tag-option-${tag}`} key={tag} role="option" aria-selected={false} className={`flex min-h-11 cursor-pointer items-center rounded-lg px-3 py-2 text-sm font-semibold ${index === activeTagIndex ? 'bg-sky-500/15 text-white' : 'text-white/80 hover:bg-slate-800 hover:text-white'}`} onMouseDown={(event) => event.preventDefault()} onClick={() => addTag(tag)}>{tag}</li>) : <li className="flex min-h-11 items-center px-3 py-2 text-sm font-normal text-white/60">No hay etiquetas que coincidan. Presiona Enter para agregarla.</li>}
+              {tagMatches.length > 0 ? tagMatches.map((tag, index) => <li id={`product-tag-option-${tag}`} key={tag} role="option" aria-selected={false} className={`flex h-11 min-h-11 cursor-pointer items-center rounded-lg px-3 py-2 text-sm font-semibold ${index === activeTagIndex ? 'bg-sky-500/15 text-white' : 'text-white/80 hover:bg-slate-800 hover:text-white'}`} onMouseDown={(event) => event.preventDefault()} onClick={() => addTag(tag)}>{tag}</li>) : <li className="flex h-11 min-h-11 items-center px-3 py-2 text-sm font-normal text-white/60">No hay etiquetas que coincidan. Presiona Enter para agregarla.</li>}
             </ul>}
           </div>
-          <ResponsiveActionButton type="button" label="Agregar etiqueta" mobileDisplay="text" disabled={busy || tags.length >= MAX_PRODUCT_TAGS} className="border border-slate-700 bg-slate-900 text-slate-200 hover:border-sky-500 hover:bg-slate-800 sm:w-auto" onClick={() => addTag()}>Agregar</ResponsiveActionButton>
+          <ResponsiveActionButton type="button" label="Agregar etiqueta" mobileDisplay="text" disabled={busy || tags.length >= MAX_PRODUCT_TAGS} className="h-11 min-h-11 border border-slate-700 bg-slate-900 text-slate-200 hover:border-sky-500 hover:bg-slate-800 sm:w-auto" onClick={() => addTag()}>Agregar</ResponsiveActionButton>
         </div>
         <p id="product-tags-help" className="text-xs leading-relaxed text-slate-500">Usa etiquetas libres para familias como paletas, eskimos, bolis, nieves en vaso, aguas frescas o sandwiches, además de sabores, presentaciones y atributos. Hasta {MAX_PRODUCT_TAGS} etiquetas de {MAX_PRODUCT_TAG_LENGTH} caracteres.</p>
         {tags.length > 0 && <ul aria-label="Etiquetas seleccionadas" className="flex flex-wrap gap-2">

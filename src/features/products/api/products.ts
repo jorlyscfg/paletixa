@@ -1,7 +1,8 @@
 import { insforge } from '../../../lib/insforge'
-import { MAX_PRODUCT_TAG_LENGTH, MAX_PRODUCT_TAGS, syncProductTags } from './productTags'
+import { normalizeCapitalizedText } from '../../../lib/textNormalization'
+import { normalizeProductTags, syncProductTags } from './productTags'
 
-export { MAX_PRODUCT_TAG_LENGTH, MAX_PRODUCT_TAGS } from './productTags'
+export { MAX_PRODUCT_TAG_LENGTH, MAX_PRODUCT_TAGS, normalizeProductTags } from './productTags'
 
 const PRODUCT_COLUMNS = 'id, name, sku, category_id, category:product_categories(id, name), retail_price_mxn, wholesale_price_mxn, active, tag_assignments:product_tag_assignments(tag:product_tags(name)), image_url, image_key, created_at, updated_at'
 
@@ -65,9 +66,16 @@ type ProductRow = {
   updated_at: string
 }
 
-function text(value: unknown, field: string) {
+function requiredId(value: unknown, field: string) {
   if (typeof value !== 'string' || value.trim() === '') throw new Error(`${field} is required`)
   return value.trim()
+}
+
+function productText(value: unknown, field: string) {
+  if (typeof value !== 'string') throw new Error(`${field} is required`)
+  const normalized = normalizeCapitalizedText(value)
+  if (normalized === '') throw new Error(`${field} is required`)
+  return normalized
 }
 
 function price(value: unknown, field: string) {
@@ -75,32 +83,11 @@ function price(value: unknown, field: string) {
   return Math.round(value * 100) / 100
 }
 
-export function normalizeProductTags(value: unknown, field = 'Tags') {
-  if (value === undefined || value === null) return []
-  if (!Array.isArray(value)) throw new Error(`${field} must be an array`)
-  if (value.length > MAX_PRODUCT_TAGS) throw new Error(`${field} cannot contain more than ${MAX_PRODUCT_TAGS} tags`)
-
-  const seen = new Set<string>()
-  const normalized: string[] = []
-  for (const tag of value) {
-    if (typeof tag !== 'string') throw new Error(`${field} must contain only strings`)
-    const trimmed = tag.trim().replace(/\s+/g, ' ')
-    if (trimmed === '') continue
-    if (trimmed.length > MAX_PRODUCT_TAG_LENGTH) throw new Error(`${field} cannot contain tags longer than ${MAX_PRODUCT_TAG_LENGTH} characters`)
-    const identity = trimmed.toLocaleLowerCase()
-    if (!seen.has(identity)) {
-      seen.add(identity)
-      normalized.push(trimmed)
-    }
-  }
-  return normalized
-}
-
 function normalizeCreate(input: CreateProductInput) {
   return {
-    name: text(input.name, 'Product name'),
-    sku: text(input.sku, 'SKU'),
-    categoryId: text(input.categoryId, 'Category ID'),
+    name: productText(input.name, 'Product name'),
+    sku: productText(input.sku, 'SKU'),
+    categoryId: requiredId(input.categoryId, 'Category ID'),
     retailPriceMxn: price(input.retailPriceMxn, 'Retail price'),
     wholesalePriceMxn: price(input.wholesalePriceMxn, 'Wholesale price'),
     tags: normalizeProductTags(input.tags),
@@ -110,9 +97,9 @@ function normalizeCreate(input: CreateProductInput) {
 
 function normalizeUpdate(input: UpdateProductInput) {
   const result: Record<string, string | number | boolean> = {}
-  if (input.name !== undefined) result.name = text(input.name, 'Product name')
-  if (input.sku !== undefined) result.sku = text(input.sku, 'SKU')
-  if (input.categoryId !== undefined) result.category_id = text(input.categoryId, 'Category ID')
+  if (input.name !== undefined) result.name = productText(input.name, 'Product name')
+  if (input.sku !== undefined) result.sku = productText(input.sku, 'SKU')
+  if (input.categoryId !== undefined) result.category_id = requiredId(input.categoryId, 'Category ID')
   if (input.retailPriceMxn !== undefined) result.retail_price_mxn = price(input.retailPriceMxn, 'Retail price')
   if (input.wholesalePriceMxn !== undefined) result.wholesale_price_mxn = price(input.wholesalePriceMxn, 'Wholesale price')
   if (input.tags !== undefined) normalizeProductTags(input.tags)
@@ -132,9 +119,9 @@ function mapProduct(data: unknown): Product {
   const tags = (row.tag_assignments ?? []).flatMap(({ tag }) => Array.isArray(tag) ? tag : tag ? [tag] : []).map(({ name }) => name)
   return {
     id: row.id,
-    name: row.name,
-    sku: row.sku,
-    category: category.name,
+    name: normalizeCapitalizedText(row.name),
+    sku: normalizeCapitalizedText(row.sku),
+    category: normalizeCapitalizedText(category.name),
     categoryId: row.category_id,
     retailPriceMxn: Number(row.retail_price_mxn),
     wholesalePriceMxn: Number(row.wholesale_price_mxn),
@@ -210,7 +197,7 @@ async function removeStorageObject(key: string) {
 }
 
 async function updateProductImageReference(productId: string, image: ProductImageAssociation | null): Promise<Product> {
-  const id = text(productId, 'Product ID')
+  const id = requiredId(productId, 'Product ID')
   const { data, error } = await insforge.database.from('products').update({
     image_url: image?.url ?? null,
     image_key: image?.key ?? null,
@@ -220,7 +207,7 @@ async function updateProductImageReference(productId: string, image: ProductImag
 }
 
 export async function uploadProductImage(productId: string, file: File): Promise<ProductImage> {
-  const id = text(productId, 'Product ID')
+  const id = requiredId(productId, 'Product ID')
   validateProductImageFile(file)
   const key = createProductImageKey(id, file)
   const { data, error } = await insforge.storage.from(PRODUCT_IMAGE_BUCKET).upload(key, file)
@@ -249,7 +236,7 @@ export async function uploadProductImage(productId: string, file: File): Promise
 }
 
 export async function replaceProductImage(productId: string, currentImage: ProductImageReference, file: File): Promise<Product> {
-  const id = text(productId, 'Product ID')
+  const id = requiredId(productId, 'Product ID')
   const uploaded = await uploadProductImage(id, file)
   let updated: Product
 
@@ -287,7 +274,7 @@ export async function replaceProductImage(productId: string, currentImage: Produ
 }
 
 export async function removeProductImage(productId: string, currentImage: ProductImageReference): Promise<Product> {
-  const id = text(productId, 'Product ID')
+  const id = requiredId(productId, 'Product ID')
   let cleared: Product
   try {
     cleared = await updateProductImageReference(id, null)
@@ -312,7 +299,7 @@ export async function removeProductImage(productId: string, currentImage: Produc
 }
 
 export async function updateProduct(id: string, input: UpdateProductInput): Promise<Product> {
-  const productId = text(id, 'Product ID')
+  const productId = requiredId(id, 'Product ID')
   const normalized = normalizeUpdate(input)
   let updated: Product | null = null
   if (Object.keys(normalized).length > 0) {

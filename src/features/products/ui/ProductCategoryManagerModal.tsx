@@ -1,4 +1,5 @@
 import { type FormEvent, useCallback, useEffect, useId, useRef, useState } from 'react'
+import { normalizeCapitalizedText } from '../../../lib/textNormalization'
 import {
   createProductCategory,
   deleteProductCategory,
@@ -75,7 +76,7 @@ export function ProductCategoryManagerModal({ categories: initialCategories, onC
     setBusy(true)
     setError('')
     try {
-      const created = await createProductCategory(newName)
+      const created = await createProductCategory(normalizeCapitalizedText(newName))
       setCategories((current) => [...current.filter(({ id }) => id !== created.id), created].sort((a, b) => a.name.localeCompare(b.name)))
       setNewName('')
       await onChanged(created, 'created')
@@ -102,7 +103,7 @@ export function ProductCategoryManagerModal({ categories: initialCategories, onC
     setBusy(true)
     setError('')
     try {
-      const updated = await updateProductCategory(categoryId, editingName)
+      const updated = await updateProductCategory(categoryId, normalizeCapitalizedText(editingName))
       setCategories((current) => [...current.filter(({ id }) => id !== updated.id), updated].sort((a, b) => a.name.localeCompare(b.name)))
       cancelEdit()
       await onChanged(updated, 'updated')
