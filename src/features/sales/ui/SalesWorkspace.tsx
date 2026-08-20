@@ -3,11 +3,35 @@ import { CatalogImageTile } from '../../../app/components/CatalogImageTile'
 import { ResponsiveActionButton } from '../../../app/components/ResponsiveActionButton'
 import { SearchInput } from '../../../app/components/SearchInput'
 import { listProducts, type Product } from '../../products/api/products'
-import { recordSale, type SaleReceipt, type SalesChannel } from '../api/sales'
+import {
+  EVENT_ADVANCE_PAYMENT_METHODS,
+  POS_PAYMENT_METHODS,
+  WHOLESALE_DELIVERY_METHODS,
+  WHOLESALE_PAYMENT_METHODS,
+  recordSale,
+  type EventAdvancePaymentMethod,
+  type PosPaymentMethod,
+  type SaleDetails,
+  type SaleReceipt,
+  type SalesChannel,
+  type WholesaleDeliveryMethod,
+  type WholesalePaymentMethod,
+} from '../api/sales'
 
 type QuantityByProduct = Record<string, string>
 type LoadState = 'loading' | 'ready' | 'error'
 type Submission = { status: 'submitting' | 'error' | 'success'; requestId: string; receipt?: SaleReceipt }
+type SaleFormState = {
+  customerName: string
+  phone: string
+  deliveryMethod: WholesaleDeliveryMethod | ''
+  paymentMethod: PosPaymentMethod | WholesalePaymentMethod | ''
+  eventName: string
+  eventDate: string
+  responsibleName: string
+  advanceAmountMxn: string
+  advancePaymentMethod: EventAdvancePaymentMethod | ''
+}
 
 type ChannelPresentation = {
   label: string
@@ -16,6 +40,8 @@ type ChannelPresentation = {
   description: string
   productsTitle: string
   productsDescription: string
+  detailsTitle: string
+  detailsDescription: string
   priceLabel: string
   accentClass: string
   actionClass: string
@@ -33,6 +59,8 @@ const channelPresentations: Record<SalesChannel, ChannelPresentation> = {
     description: 'Registra una venta de mostrador con el catálogo compartido. El servidor confirma los precios y el total antes de guardarla.',
     productsTitle: 'Productos para mostrador',
     productsDescription: 'Selecciona productos y ajusta las cantidades para esta venta.',
+    detailsTitle: 'Datos de la venta de mostrador',
+    detailsDescription: 'La forma de pago es obligatoria. El nombre del cliente te ayuda a identificar la venta y es opcional.',
     priceLabel: 'Precio de menudeo',
     accentClass: 'text-sky-400',
     actionClass: 'bg-sky-600 text-white shadow-lg shadow-sky-950/30 hover:bg-sky-500',
@@ -48,6 +76,8 @@ const channelPresentations: Record<SalesChannel, ChannelPresentation> = {
     description: 'Prepara una venta por volumen con precios mayoristas. El servidor confirma el total antes de registrarla en el registro unificado de ventas.',
     productsTitle: 'Productos para mayoristas',
     productsDescription: 'Selecciona productos y arma el pedido con las cantidades acordadas.',
+    detailsTitle: 'Datos del pedido mayorista',
+    detailsDescription: 'Captura los datos de contacto, la entrega y la forma de pago antes de revisar el pedido.',
     priceLabel: 'Precio de mayoreo',
     accentClass: 'text-amber-400',
     actionClass: 'bg-amber-600 text-white shadow-lg shadow-amber-950/30 hover:bg-amber-500',
@@ -63,6 +93,8 @@ const channelPresentations: Record<SalesChannel, ChannelPresentation> = {
     description: 'Arma una venta para un evento con los productos compartidos. Este canal aplica el precio de menudeo al registrar la venta.',
     productsTitle: 'Productos para eventos',
     productsDescription: 'Selecciona los productos y cantidades que llevarás a la venta del evento.',
+    detailsTitle: 'Datos del evento',
+    detailsDescription: 'Identifica el evento, la fecha y a la persona responsable. El anticipo es opcional.',
     priceLabel: 'Precio para evento',
     accentClass: 'text-violet-400',
     actionClass: 'bg-violet-600 text-white shadow-lg shadow-violet-950/30 hover:bg-violet-500',
@@ -74,6 +106,24 @@ const channelPresentations: Record<SalesChannel, ChannelPresentation> = {
 }
 const ALL_CATEGORIES = 'Todas las categorías'
 const inactiveCategoryClass = 'border-slate-800 bg-slate-900/60 text-slate-300 hover:border-slate-700 hover:text-white'
+const posPaymentLabels: Record<PosPaymentMethod, string> = { cash: 'Efectivo', card: 'Tarjeta', transfer: 'Transferencia', other: 'Otro' }
+const wholesalePaymentLabels: Record<WholesalePaymentMethod, string> = { credit: 'Crédito', cash: 'Efectivo', transfer: 'Transferencia' }
+const deliveryLabels: Record<WholesaleDeliveryMethod, string> = { delivery: 'Entrega', pickup: 'Recoger' }
+const advancePaymentLabels: Record<EventAdvancePaymentMethod, string> = { cash: 'Efectivo', card: 'Tarjeta' }
+
+function initialSaleForm(): SaleFormState {
+  return {
+    customerName: '',
+    phone: '',
+    deliveryMethod: '',
+    paymentMethod: '',
+    eventName: '',
+    eventDate: '',
+    responsibleName: '',
+    advanceAmountMxn: '',
+    advancePaymentMethod: '',
+  }
+}
 
 function formatMxn(value: number) {
   return `$${value.toFixed(2)} MXN`
@@ -108,13 +158,150 @@ function createRequestId() {
   return typeof randomUUID === 'function' ? randomUUID.call(globalThis.crypto) : `sale-${Date.now()}-${Math.random().toString(36).slice(2)}`
 }
 
+function requiredDetail(value: string, label: string) {
+  const normalized = value.trim()
+  if (normalized === '') throw new Error(`${label} es obligatorio.`)
+  return normalized
+}
+
+function buildSaleDetails(channel: SalesChannel, form: SaleFormState): SaleDetails {
+  if (channel === 'pos') {
+    if (!POS_PAYMENT_METHODS.includes(form.paymentMethod as PosPaymentMethod)) throw new Error('Selecciona una forma de pago para la venta.')
+    const customerName = form.customerName.trim()
+    return {
+      channel,
+      ...(customerName ? { customerName } : {}),
+      paymentMethod: form.paymentMethod as PosPaymentMethod,
+    }
+  }
+  if (channel === 'wholesale') {
+    if (!WHOLESALE_DELIVERY_METHODS.includes(form.deliveryMethod as WholesaleDeliveryMethod)) throw new Error('Selecciona un método de entrega.')
+    if (!WHOLESALE_PAYMENT_METHODS.includes(form.paymentMethod as WholesalePaymentMethod)) throw new Error('Selecciona una forma de pago para el pedido.')
+    return {
+      channel,
+      customerName: requiredDetail(form.customerName, 'El nombre del cliente'),
+      phone: requiredDetail(form.phone, 'El teléfono del cliente'),
+      deliveryMethod: form.deliveryMethod as WholesaleDeliveryMethod,
+      paymentMethod: form.paymentMethod as WholesalePaymentMethod,
+    }
+  }
+  const advanceText = form.advanceAmountMxn.trim()
+  let advanceAmountMxn: number | undefined
+  if (advanceText !== '') {
+    advanceAmountMxn = Number(advanceText)
+    if (!Number.isFinite(advanceAmountMxn) || advanceAmountMxn < 0) throw new Error('El anticipo debe ser un monto MXN no negativo.')
+  }
+  const eventDate = form.eventDate.trim()
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(eventDate)) throw new Error('La fecha del evento debe tener un formato válido.')
+  if (advanceAmountMxn !== undefined && advanceAmountMxn > 0 && !EVENT_ADVANCE_PAYMENT_METHODS.includes(form.advancePaymentMethod as EventAdvancePaymentMethod)) {
+    throw new Error('Selecciona una forma de pago para el anticipo.')
+  }
+  return {
+    channel,
+    eventName: requiredDetail(form.eventName, 'El nombre del evento'),
+    eventDate,
+    responsibleName: requiredDetail(form.responsibleName, 'El nombre de la persona responsable'),
+    ...(advanceAmountMxn === undefined ? {} : { advanceAmountMxn }),
+    ...(advanceAmountMxn !== undefined && advanceAmountMxn > 0
+      ? { advancePaymentMethod: form.advancePaymentMethod as EventAdvancePaymentMethod }
+      : {}),
+  }
+}
+
+function SaleDetailsSection({
+  channel,
+  presentation,
+  form,
+  disabled,
+  onChange,
+}: {
+  channel: SalesChannel
+  presentation: ChannelPresentation
+  form: SaleFormState
+  disabled: boolean
+  onChange: (field: keyof SaleFormState, value: string) => void
+}) {
+  const inputClass = 'ops-control mt-2 min-h-11 w-full px-3 text-sm outline-none transition-colors focus:border-sky-400 focus:ring-2 focus:ring-sky-500/30'
+  const choiceClass = 'flex min-h-11 cursor-pointer items-center gap-2 rounded-xl border border-slate-700 bg-slate-950 px-3 text-sm font-semibold text-white transition-colors has-[:checked]:border-sky-400 has-[:checked]:bg-sky-500/10'
+
+  return <section aria-labelledby="sale-details-title" className={`mb-5 rounded-2xl border bg-slate-950/55 p-4 ${presentation.cardBorderClass}`}>
+    <h2 id="sale-details-title" className={`text-sm font-black uppercase tracking-[0.12em] ${presentation.accentClass}`}>{presentation.detailsTitle}</h2>
+    <p className="mt-2 text-xs leading-relaxed text-slate-400">{presentation.detailsDescription}</p>
+
+    {channel === 'pos' && <div className="mt-4 grid gap-4">
+      <label className="text-xs font-bold text-slate-300">Nombre del cliente <span className="font-normal text-slate-500">(opcional)</span>
+        <input className={inputClass} value={form.customerName} disabled={disabled} onChange={(event) => onChange('customerName', event.target.value)} placeholder="Ej. Ana López" />
+      </label>
+      <fieldset>
+        <legend className="text-xs font-bold text-slate-300">Forma de pago <span className="text-amber-300">(obligatoria)</span></legend>
+        <div className="mt-2 grid grid-cols-2 gap-2">
+          {POS_PAYMENT_METHODS.map((method) => <label key={method} className={choiceClass}>
+            <input type="radio" name="pos-payment-method" value={method} checked={form.paymentMethod === method} disabled={disabled} onChange={(event) => onChange('paymentMethod', event.target.value)} className="h-4 w-4 accent-sky-400" />
+            {posPaymentLabels[method]}
+          </label>)}
+        </div>
+      </fieldset>
+    </div>}
+
+    {channel === 'wholesale' && <div className="mt-4 grid gap-4">
+      <label className="text-xs font-bold text-slate-300">Nombre del cliente <span className="text-amber-300">(obligatorio)</span>
+        <input className={inputClass} value={form.customerName} disabled={disabled} onChange={(event) => onChange('customerName', event.target.value)} placeholder="Ej. Tienda La Plaza" />
+      </label>
+      <label className="text-xs font-bold text-slate-300">Teléfono <span className="text-amber-300">(obligatorio)</span>
+        <input className={inputClass} value={form.phone} disabled={disabled} onChange={(event) => onChange('phone', event.target.value)} inputMode="tel" placeholder="Ej. 55 1234 5678" />
+      </label>
+      <label className="text-xs font-bold text-slate-300">Método de entrega <span className="text-amber-300">(obligatorio)</span>
+        <select className={inputClass} value={form.deliveryMethod} disabled={disabled} onChange={(event) => onChange('deliveryMethod', event.target.value)}>
+          <option value="">Selecciona una opción</option>
+          {WHOLESALE_DELIVERY_METHODS.map((method) => <option key={method} value={method}>{deliveryLabels[method]}</option>)}
+        </select>
+      </label>
+      <fieldset>
+        <legend className="text-xs font-bold text-slate-300">Forma de pago <span className="text-amber-300">(obligatoria)</span></legend>
+        <div className="mt-2 grid grid-cols-2 gap-2">
+          {WHOLESALE_PAYMENT_METHODS.map((method) => <label key={method} className={choiceClass}>
+            <input type="radio" name="wholesale-payment-method" value={method} checked={form.paymentMethod === method} disabled={disabled} onChange={(event) => onChange('paymentMethod', event.target.value)} className="h-4 w-4 accent-amber-400" />
+            {wholesalePaymentLabels[method]}
+          </label>)}
+        </div>
+      </fieldset>
+    </div>}
+
+    {channel === 'event' && <div className="mt-4 grid gap-4">
+      <label className="text-xs font-bold text-slate-300">Nombre del evento <span className="text-amber-300">(obligatorio)</span>
+        <input className={inputClass} value={form.eventName} disabled={disabled} onChange={(event) => onChange('eventName', event.target.value)} placeholder="Ej. Festival de verano" />
+      </label>
+      <label className="text-xs font-bold text-slate-300">Fecha del evento <span className="text-amber-300">(obligatoria)</span>
+        <input className={inputClass} type="date" value={form.eventDate} disabled={disabled} onChange={(event) => onChange('eventDate', event.target.value)} />
+      </label>
+      <label className="text-xs font-bold text-slate-300">Responsable o cliente <span className="text-amber-300">(obligatorio)</span>
+        <input className={inputClass} value={form.responsibleName} disabled={disabled} onChange={(event) => onChange('responsibleName', event.target.value)} placeholder="Ej. Mariana Torres" />
+      </label>
+      <label className="text-xs font-bold text-slate-300">Anticipo en MXN <span className="font-normal text-slate-500">(opcional)</span>
+        <input className={inputClass} type="number" min="0" step="0.01" inputMode="decimal" value={form.advanceAmountMxn} disabled={disabled} onChange={(event) => onChange('advanceAmountMxn', event.target.value)} placeholder="0.00" />
+      </label>
+      {Number(form.advanceAmountMxn) > 0 && <fieldset>
+        <legend className="text-xs font-bold text-slate-300">Forma de pago del anticipo <span className="text-amber-300">(obligatoria si hay anticipo)</span></legend>
+        <div className="mt-2 grid grid-cols-2 gap-2">
+          {EVENT_ADVANCE_PAYMENT_METHODS.map((method) => <label key={method} className={choiceClass}>
+            <input type="radio" name="event-advance-payment-method" value={method} checked={form.advancePaymentMethod === method} disabled={disabled} onChange={(event) => onChange('advancePaymentMethod', event.target.value)} className="h-4 w-4 accent-violet-400" />
+            {advancePaymentLabels[method]}
+          </label>)}
+        </div>
+      </fieldset>}
+    </div>}
+  </section>
+}
+
 export function SalesWorkspace({ channel }: { channel: SalesChannel }) {
   const [products, setProducts] = useState<Product[]>([])
   const [loadState, setLoadState] = useState<LoadState>('loading')
   const [searchQuery, setSearchQuery] = useState('')
   const [selectedCategory, setSelectedCategory] = useState(ALL_CATEGORIES)
   const [quantities, setQuantities] = useState<QuantityByProduct>({})
+  const [saleForm, setSaleForm] = useState<SaleFormState>(initialSaleForm)
   const [reviewed, setReviewed] = useState(false)
+  const [reviewedDetails, setReviewedDetails] = useState<SaleDetails | null>(null)
   const [validationError, setValidationError] = useState('')
   const [loadError, setLoadError] = useState(false)
   const [submission, setSubmission] = useState<Submission | null>(null)
@@ -148,6 +335,15 @@ export function SalesWorkspace({ channel }: { channel: SalesChannel }) {
   function changeQuantity(productId: string, value: string) {
     setQuantities((current) => ({ ...current, [productId]: value }))
     setReviewed(false)
+    setReviewedDetails(null)
+    setValidationError('')
+    setSubmission(null)
+  }
+
+  function changeSaleDetail(field: keyof SaleFormState, value: string) {
+    setSaleForm((current) => ({ ...current, [field]: value }))
+    setReviewed(false)
+    setReviewedDetails(null)
     setValidationError('')
     setSubmission(null)
   }
@@ -165,7 +361,9 @@ export function SalesWorkspace({ channel }: { channel: SalesChannel }) {
 
   function clearCart() {
     setQuantities({})
+    setSaleForm(initialSaleForm())
     setReviewed(false)
+    setReviewedDetails(null)
     setValidationError('')
     setSubmission(null)
   }
@@ -185,18 +383,27 @@ export function SalesWorkspace({ channel }: { channel: SalesChannel }) {
       setValidationError('Selecciona al menos un producto para agregarlo a la venta.')
       return
     }
+    let details: SaleDetails
+    try {
+      details = buildSaleDetails(channel, saleForm)
+    } catch (error) {
+      setValidationError(error instanceof Error ? error.message : 'Completa los datos de la venta.')
+      return
+    }
     setValidationError('')
     setSubmission(null)
+    setReviewedDetails(details)
     setReviewed(true)
   }
 
   async function submitSale() {
     const items = getSaleItems(products, quantities)
     if (items.length === 0) return
+    if (!reviewedDetails) return
     const requestId = submission?.requestId ?? createRequestId()
     setSubmission({ status: 'submitting', requestId })
     try {
-      const receipt = await recordSale({ requestId, channel, items: items.map(({ product, quantity }) => ({ productId: product.id, quantity })) })
+      const receipt = await recordSale({ requestId, channel, details: reviewedDetails, items: items.map(({ product, quantity }) => ({ productId: product.id, quantity })) })
       setSubmission({ status: 'success', requestId, receipt })
     } catch {
       setSubmission({ status: 'error', requestId })
@@ -333,15 +540,17 @@ export function SalesWorkspace({ channel }: { channel: SalesChannel }) {
       </div>
 
       <aside aria-labelledby={reviewed ? 'review-title' : 'cart-title'} className={`h-fit rounded-2xl border bg-slate-900/85 p-4 shadow-xl lg:sticky lg:top-6 ${reviewed ? presentation.cardBorderClass : 'border-slate-800'}`}>
-        <div className="flex items-start justify-between gap-3 border-b border-slate-800 pb-4">
+         <div className="flex items-start justify-between gap-3 border-b border-slate-800 pb-4">
           <div>
             <h2 id={reviewed ? 'review-title' : 'cart-title'} className="text-base font-black text-white">{reviewed ? 'Revisar venta' : 'Resumen del carrito'}</h2>
             <p className="mt-1 text-xs text-slate-500">{presentation.label} · {itemCount} {itemCount === 1 ? 'artículo' : 'artículos'}</p>
           </div>
-          {cartProducts.length > 0 && <ResponsiveActionButton type="button" label="Vaciar selección de venta" icon="close" mobileDisplay="text" onClick={clearCart} disabled={isSubmitting || isComplete} className="text-xs text-slate-400 hover:bg-slate-800 hover:text-white">Vaciar</ResponsiveActionButton>}
-        </div>
+           {cartProducts.length > 0 && <ResponsiveActionButton type="button" label="Vaciar selección de venta" icon="close" mobileDisplay="text" onClick={clearCart} disabled={isSubmitting || isComplete} className="text-xs text-slate-400 hover:bg-slate-800 hover:text-white">Vaciar</ResponsiveActionButton>}
+         </div>
 
-        {cartProducts.length === 0 ? <div className="py-10 text-center">
+         <SaleDetailsSection channel={channel} presentation={presentation} form={saleForm} disabled={isSubmitting || isComplete} onChange={changeSaleDetail} />
+
+         {cartProducts.length === 0 ? <div className="py-10 text-center">
           <p className="text-sm font-semibold text-slate-300">El carrito está vacío.</p>
           <p className="mt-2 text-xs leading-relaxed text-slate-500">Agrega productos del catálogo para iniciar una venta.</p>
         </div> : <ul className="divide-y divide-slate-800">

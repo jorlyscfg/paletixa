@@ -3,14 +3,52 @@ import { insforge } from '../../../lib/insforge'
 export const SALES_CHANNELS = ['pos', 'wholesale', 'event'] as const
 export type SalesChannel = typeof SALES_CHANNELS[number]
 
+export const POS_PAYMENT_METHODS = ['cash', 'card', 'transfer', 'other'] as const
+export type PosPaymentMethod = typeof POS_PAYMENT_METHODS[number]
+
+export const WHOLESALE_DELIVERY_METHODS = ['delivery', 'pickup'] as const
+export type WholesaleDeliveryMethod = typeof WHOLESALE_DELIVERY_METHODS[number]
+
+export const WHOLESALE_PAYMENT_METHODS = ['credit', 'cash', 'transfer'] as const
+export type WholesalePaymentMethod = typeof WHOLESALE_PAYMENT_METHODS[number]
+
+export const EVENT_ADVANCE_PAYMENT_METHODS = ['cash', 'card'] as const
+export type EventAdvancePaymentMethod = typeof EVENT_ADVANCE_PAYMENT_METHODS[number]
+
 export type SaleItemInput = {
   productId: string
   quantity: number
 }
 
+export type PosSaleDetails = {
+  channel: 'pos'
+  customerName?: string
+  paymentMethod: PosPaymentMethod
+}
+
+export type WholesaleSaleDetails = {
+  channel: 'wholesale'
+  customerName: string
+  phone: string
+  deliveryMethod: WholesaleDeliveryMethod
+  paymentMethod: WholesalePaymentMethod
+}
+
+export type EventSaleDetails = {
+  channel: 'event'
+  eventName: string
+  eventDate: string
+  responsibleName: string
+  advanceAmountMxn?: number
+  advancePaymentMethod?: EventAdvancePaymentMethod
+}
+
+export type SaleDetails = PosSaleDetails | WholesaleSaleDetails | EventSaleDetails
+
 export type RecordSaleInput = {
   requestId: string
   channel: SalesChannel
+  details: SaleDetails
   items: SaleItemInput[]
 }
 
@@ -59,6 +97,74 @@ function channel(value: unknown): SalesChannel {
   return value as SalesChannel
 }
 
+function knownFields(value: unknown, allowed: readonly string[]) {
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) throw new Error('Sale details must be an object')
+  const unknown = Object.keys(value).filter((key) => !allowed.includes(key))
+  if (unknown.length > 0) throw new Error('Sale details contain unknown fields')
+}
+
+function requiredText(value: unknown, field: string, maxLength = 160) {
+  const normalized = text(value, field)
+  if (normalized.length > maxLength) throw new Error(`${field} is too long`)
+  return normalized
+}
+
+function optionalText(value: unknown, field: string, maxLength = 160) {
+  if (value === undefined || value === null) return undefined
+  if (typeof value !== 'string') throw new Error(`${field} must be a string`)
+  const normalized = value.trim()
+  if (normalized === '') return undefined
+  if (normalized.length > maxLength) throw new Error(`${field} is too long`)
+  return normalized
+}
+
+function enumValue<T extends string>(value: unknown, values: readonly T[], field: string): T {
+  if (typeof value !== 'string' || !values.includes(value as T)) throw new Error(`${field} is invalid`)
+  return value as T
+}
+
+function isoDate(value: unknown) {
+  const normalized = requiredText(value, 'Event date', 10)
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(normalized)) throw new Error('Event date must be an ISO date')
+  const parsed = new Date(`${normalized}T00:00:00Z`)
+  if (Number.isNaN(parsed.getTime()) || parsed.toISOString().slice(0, 10) !== normalized) throw new Error('Event date must be an ISO date')
+  return normalized
+}
+
+function normalizeDetails(saleChannel: SalesChannel, details: SaleDetails) {
+  if (!details || typeof details !== 'object' || details.channel !== saleChannel) throw new Error('Sale details do not match the sales channel')
+  if (details.channel === 'pos') {
+    knownFields(details, ['channel', 'customerName', 'paymentMethod'])
+    const customerName = optionalText(details.customerName, 'Customer name')
+    return {
+      ...(customerName === undefined ? {} : { customer_name: customerName }),
+      payment_method: enumValue(details.paymentMethod, POS_PAYMENT_METHODS, 'POS payment method'),
+    }
+  }
+  if (details.channel === 'wholesale') {
+    knownFields(details, ['channel', 'customerName', 'phone', 'deliveryMethod', 'paymentMethod'])
+    return {
+      customer_name: requiredText(details.customerName, 'Wholesale customer name'),
+      phone: requiredText(details.phone, 'Wholesale customer phone', 40),
+      delivery_method: enumValue(details.deliveryMethod, WHOLESALE_DELIVERY_METHODS, 'Wholesale delivery method'),
+      payment_method: enumValue(details.paymentMethod, WHOLESALE_PAYMENT_METHODS, 'Wholesale payment method'),
+    }
+  }
+  knownFields(details, ['channel', 'eventName', 'eventDate', 'responsibleName', 'advanceAmountMxn', 'advancePaymentMethod'])
+  const advanceAmount = details.advanceAmountMxn
+  if (advanceAmount !== undefined && (!Number.isFinite(advanceAmount) || advanceAmount < 0)) throw new Error('Advance amount cannot be negative')
+  const advancePaymentMethod = advanceAmount !== undefined && advanceAmount > 0
+    ? enumValue(details.advancePaymentMethod, EVENT_ADVANCE_PAYMENT_METHODS, 'Advance payment method')
+    : undefined
+  return {
+    event_name: requiredText(details.eventName, 'Event name'),
+    event_date: isoDate(details.eventDate),
+    responsible_name: requiredText(details.responsibleName, 'Event responsible name'),
+    ...(advanceAmount === undefined ? {} : { advance_amount_mxn: advanceAmount }),
+    ...(advancePaymentMethod === undefined ? {} : { advance_payment_method: advancePaymentMethod }),
+  }
+}
+
 function normalizeItems(items: SaleItemInput[]) {
   if (!Array.isArray(items) || items.length === 0) throw new Error('At least one sale item is required')
   return items.map((item) => {
@@ -84,10 +190,12 @@ export async function recordSale(input: RecordSaleInput): Promise<SaleReceipt> {
   const requestId = text(input.requestId, 'Request ID')
   const saleChannel = channel(input.channel)
   const items = normalizeItems(input.items)
+  const details = normalizeDetails(saleChannel, input.details)
   const { data, error } = await insforge.database.rpc('record_sale', {
     p_request_id: requestId,
     p_channel: saleChannel,
     p_items: items,
+    p_details: details,
   })
   if (error) throw error
   return mapReceipt(data)

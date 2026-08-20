@@ -21,6 +21,7 @@ let reportTo: string
 let baseline: ReportRow[]
 
 type ReportRow = { channel: string; sale_count: number | string; total_mxn: number | string }
+type SaleDetails = Record<string, unknown>
 
 async function cli(command: string[]) {
   const { stdout } = await exec('npx', ['-y', '@insforge/cli', ...command, '--json'], {
@@ -84,41 +85,62 @@ afterAll(async () => {
 }, 30_000)
 
 describe.skipIf(!repeatable)('shared sales ledger contracts', () => {
-  const record = (requestId: string, channel: string, items: unknown[]) => data<{ sale_id: string; channel: string; total_mxn: number | string; result_status: string }[]>(client.database.rpc('record_sale', {
-    p_request_id: requestId, p_channel: channel, p_items: items,
+  const record = (requestId: string, channel: string, items: unknown[], details: SaleDetails) => data<{ sale_id: string; channel: string; total_mxn: number | string; result_status: string }[]>(client.database.rpc('record_sale', {
+    p_request_id: requestId, p_channel: channel, p_items: items, p_details: details,
   }))
 
   it('uses the retail price for POS and events, wholesale price for wholesale, and snapshots items', async () => {
     const posRequest = crypto.randomUUID()
     const wholesaleRequest = crypto.randomUUID()
-    const eventRequest = crypto.randomUUID()
-    const pos = await record(posRequest, 'pos', [{ product_id: fixture.retailProductId, quantity: 2 }])
-    const wholesale = await record(wholesaleRequest, 'wholesale', [{ product_id: fixture.retailProductId, quantity: 2 }])
-    const event = await record(eventRequest, 'event', [{ product_id: fixture.retailProductId, quantity: 3 }])
+    const pos = await record(posRequest, 'pos', [{ product_id: fixture.retailProductId, quantity: 2 }], { customer_name: 'Contract POS', payment_method: 'cash' })
+    const wholesale = await record(wholesaleRequest, 'wholesale', [{ product_id: fixture.retailProductId, quantity: 2 }], { customer_name: 'Contract Wholesale', phone: '55 1234 5678', delivery_method: 'delivery', payment_method: 'credit' })
     expect(Number(pos[0].total_mxn)).toBe(21)
     expect(Number(wholesale[0].total_mxn)).toBe(14.5)
-    expect(Number(event[0].total_mxn)).toBe(31.5)
     const items = await data<Record<string, unknown>[]>(client.database.from('sale_items').select('product_id, product_name, unit_price_mxn, quantity, line_total_mxn').eq('sale_id', pos[0].sale_id))
     expect(items).toEqual([expect.objectContaining({ product_id: fixture.retailProductId, product_name: 'Ledger Mango', quantity: 2 })])
     expect(Number(items[0].unit_price_mxn)).toBe(10.5)
     expect(Number(items[0].line_total_mxn)).toBe(21)
+    const contexts = await data<Record<string, unknown>[]>(client.database.from('sales').select('business_context').eq('id', pos[0].sale_id))
+    expect(contexts).toEqual([{ business_context: { customer_name: 'Contract POS', payment_method: 'cash' } }])
+  }, 20_000)
+
+  it('accepts an event without an advance, rejects a positive advance without a method, and accepts a positive advance with a method', async () => {
+    const eventDetails = { event_name: 'Contract Event', event_date: '2026-09-12', responsible_name: 'Contract Responsible' }
+    const noAdvance = await record(crypto.randomUUID(), 'event', [{ product_id: fixture.retailProductId, quantity: 3 }], eventDetails)
+    expect(Number(noAdvance[0].total_mxn)).toBe(31.5)
+
+    await expect(record(crypto.randomUUID(), 'event', [{ product_id: fixture.retailProductId, quantity: 3 }], {
+      ...eventDetails,
+      advance_amount_mxn: 250,
+    })).rejects.toThrow(/advance payment method/i)
+
+    const paidAdvance = await record(crypto.randomUUID(), 'event', [{ product_id: fixture.retailProductId, quantity: 3 }], {
+      ...eventDetails,
+      advance_amount_mxn: 250,
+      advance_payment_method: 'card',
+    })
+    expect(Number(paidAdvance[0].total_mxn)).toBe(31.5)
   }, 20_000)
 
   it('replays the same request without creating another sale and rejects payload conflicts', async () => {
     const requestId = crypto.randomUUID()
-    const first = await record(requestId, 'pos', [{ product_id: fixture.retailProductId, quantity: 1 }])
-    const replay = await record(requestId, 'pos', [{ product_id: fixture.retailProductId, quantity: 1 }])
+    const details = { payment_method: 'cash' }
+    const first = await record(requestId, 'pos', [{ product_id: fixture.retailProductId, quantity: 1 }], details)
+    const replay = await record(requestId, 'pos', [{ product_id: fixture.retailProductId, quantity: 1 }], details)
     expect(replay).toEqual(first.map((row) => ({ ...row, result_status: 'replayed' })))
-    await expect(record(requestId, 'pos', [{ product_id: fixture.retailProductId, quantity: 2 }])).rejects.toThrow(/conflict/i)
+    await expect(record(requestId, 'pos', [{ product_id: fixture.retailProductId, quantity: 2 }], details)).rejects.toThrow(/conflict/i)
+    await expect(record(requestId, 'pos', [{ product_id: fixture.retailProductId, quantity: 1 }], { payment_method: 'card' })).rejects.toThrow(/conflict/i)
     const rows = await data<Record<string, unknown>[]>(client.database.from('sales').select('id').eq('request_id', requestId))
     expect(rows).toHaveLength(1)
   }, 20_000)
 
   it('rejects invalid channels, quantities, missing products, and inactive products atomically', async () => {
-    await expect(record(crypto.randomUUID(), 'counter', [{ product_id: fixture.retailProductId, quantity: 1 }])).rejects.toThrow(/channel/i)
-    await expect(record(crypto.randomUUID(), 'pos', [{ product_id: fixture.retailProductId, quantity: 0 }])).rejects.toThrow(/positive integer/i)
-    await expect(record(crypto.randomUUID(), 'pos', [{ product_id: crypto.randomUUID(), quantity: 1 }])).rejects.toThrow(/not found/i)
-    await expect(record(crypto.randomUUID(), 'pos', [{ product_id: fixture.inactiveProductId, quantity: 1 }])).rejects.toThrow(/not found or inactive/i)
+    await expect(record(crypto.randomUUID(), 'counter', [{ product_id: fixture.retailProductId, quantity: 1 }], { payment_method: 'cash' })).rejects.toThrow(/channel/i)
+    await expect(record(crypto.randomUUID(), 'pos', [{ product_id: fixture.retailProductId, quantity: 0 }], { payment_method: 'cash' })).rejects.toThrow(/positive integer/i)
+    await expect(record(crypto.randomUUID(), 'pos', [{ product_id: crypto.randomUUID(), quantity: 1 }], { payment_method: 'cash' })).rejects.toThrow(/not found/i)
+    await expect(record(crypto.randomUUID(), 'pos', [{ product_id: fixture.inactiveProductId, quantity: 1 }], { payment_method: 'cash' })).rejects.toThrow(/not found or inactive/i)
+    await expect(record(crypto.randomUUID(), 'event', [{ product_id: fixture.retailProductId, quantity: 1 }], { event_name: 'Bad Date', event_date: '2026-02-30', responsible_name: 'Tester', advance_payment_method: 'cash' })).rejects.toThrow(/ISO date/i)
+    await expect(record(crypto.randomUUID(), 'event', [{ product_id: fixture.retailProductId, quantity: 1 }], { event_name: 'Negative', event_date: '2026-09-12', responsible_name: 'Tester', advance_amount_mxn: -1, advance_payment_method: 'cash' })).rejects.toThrow(/negative/i)
   }, 20_000)
 
   it('aggregates all three channels and always returns the complete report shape', async () => {
@@ -128,15 +150,15 @@ describe.skipIf(!repeatable)('shared sales ledger contracts', () => {
     const after = Object.fromEntries(report.map((row) => [row.channel, row]))
     expect(Number(after.pos.sale_count) - Number(before.pos.sale_count)).toBe(2)
     expect(Number(after.wholesale.sale_count) - Number(before.wholesale.sale_count)).toBe(1)
-    expect(Number(after.event.sale_count) - Number(before.event.sale_count)).toBe(1)
+    expect(Number(after.event.sale_count) - Number(before.event.sale_count)).toBe(2)
     expect(Number(after.pos.total_mxn) - Number(before.pos.total_mxn)).toBe(31.5)
     expect(Number(after.wholesale.total_mxn) - Number(before.wholesale.total_mxn)).toBe(14.5)
-    expect(Number(after.event.total_mxn) - Number(before.event.total_mxn)).toBe(31.5)
+    expect(Number(after.event.total_mxn) - Number(before.event.total_mxn)).toBe(63)
   }, 20_000)
 
   it('does not expose either privileged RPC to anonymous callers', async () => {
     const anonymous = createClient({ baseUrl })
-    await expect(data(anonymous.database.rpc('record_sale', { p_request_id: crypto.randomUUID(), p_channel: 'pos', p_items: [] }))).rejects.toThrow()
+    await expect(data(anonymous.database.rpc('record_sale', { p_request_id: crypto.randomUUID(), p_channel: 'pos', p_items: [], p_details: { payment_method: 'cash' } }))).rejects.toThrow()
     await expect(data(anonymous.database.rpc('report_sales_by_channel', { p_from: reportFrom, p_to: reportTo }))).rejects.toThrow()
   }, 20_000)
 })
