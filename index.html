@@ -2,8 +2,27 @@
 <html lang="es">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="description" content="Paletixa project foundation" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <meta name="description" content="Catálogo y operaciones de La Paleti'Xa en Playa del Carmen y la Riviera Maya." />
+    <meta name="theme-color" content="#fff8e7" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-title" content="Paletixa" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <link rel="icon" href="/paletixa-icon-v1-192.svg" type="image/svg+xml" />
+    <link rel="apple-touch-icon" sizes="192x192" href="/paletixa-icon-v1-192.svg" />
+    <script>
+      (() => {
+        const fallback = 'brand';
+        let theme = fallback;
+        try {
+          const stored = localStorage.getItem('paletixa:theme');
+          if (stored === 'light' || stored === 'dark' || stored === 'brand') theme = stored;
+        } catch {}
+        document.documentElement.dataset.theme = theme;
+        document.documentElement.style.colorScheme = theme === 'dark' ? 'dark' : 'light';
+      })();
+    </script>
     <title>Paletixa</title>
   </head>
   <body>

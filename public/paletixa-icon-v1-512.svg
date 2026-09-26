@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-labelledby="title desc">
+  <title id="title">Paletixa</title>
+  <desc id="desc">Monograma P de La Paleti'Xa sobre un fondo coral y mango</desc>
+  <rect width="512" height="512" rx="112" fill="#fff8e7"/>
+  <circle cx="256" cy="256" r="192" fill="#d94770"/>
+  <path d="M208 138h91c66 0 104 38 104 95s-38 95-104 95h-35v48h-56V138Zm56 48v94h33c33 0 51-17 51-47s-18-47-51-47h-33Z" fill="#fff8e7"/>
+  <circle cx="120" cy="125" r="29" fill="#f5ad3f"/>
+  <circle cx="408" cy="402" r="27" fill="#9fe2ad"/>
+</svg>

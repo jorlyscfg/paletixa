@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useId, useMemo, useRef, useState } from 'react'
+import { FloatingLayer } from './FloatingLayer'
 import { Icon } from './icons'
 
 type CustomDatePickerProps = {
@@ -7,8 +8,10 @@ type CustomDatePickerProps = {
   className?: string
   placeholder?: string
   disabled?: boolean
+  minValue?: string
   align?: 'left' | 'right'
   ariaLabel?: string
+  ariaRequired?: boolean
   ariaInvalid?: boolean
 }
 
@@ -36,26 +39,21 @@ function cellsFor(date: Date) {
   })
 }
 
-export function CustomDatePicker({ value, onChange, className = '', placeholder = 'Selecciona una fecha', disabled = false, align = 'left', ariaLabel, ariaInvalid = false }: CustomDatePickerProps) {
+export function CustomDatePicker({ value, onChange, className = '', placeholder = 'Selecciona una fecha', disabled = false, minValue, align = 'left', ariaLabel, ariaRequired = false, ariaInvalid = false }: CustomDatePickerProps) {
   const selected = useMemo(() => parseDate(value), [value])
+  const minimum = useMemo(() => (minValue ? parseDate(minValue) : null), [minValue])
   const [open, setOpen] = useState(false)
-  const [navDate, setNavDate] = useState(() => selected ?? new Date())
+  const [navDate, setNavDate] = useState(() => selected && (!minimum || selected >= minimum) ? selected : minimum ?? new Date())
   const rootRef = useRef<HTMLDivElement>(null)
+  const triggerRef = useRef<HTMLButtonElement>(null)
+  const calendarId = `calendar-${useId().replace(/:/g, '')}`
 
   useEffect(() => {
     if (selected) {
       // eslint-disable-next-line react-hooks/set-state-in-effect
-      setNavDate(selected)
+      setNavDate(selected && (!minimum || selected >= minimum) ? selected : minimum ?? selected)
     }
-  }, [selected])
-
-  useEffect(() => {
-    if (!open) return
-    const close = (event: MouseEvent) => { if (!rootRef.current?.contains(event.target as Node)) setOpen(false) }
-    const escape = (event: KeyboardEvent) => { if (event.key === 'Escape') setOpen(false) }
-    document.addEventListener('mousedown', close); document.addEventListener('keydown', escape)
-    return () => { document.removeEventListener('mousedown', close); document.removeEventListener('keydown', escape) }
-  }, [open])
+  }, [minimum, selected])
 
   const cells = cellsFor(navDate)
   const label = selected ? selected.toLocaleDateString('es-MX', { month: 'short', day: 'numeric', year: 'numeric' }) : placeholder
@@ -63,18 +61,18 @@ export function CustomDatePicker({ value, onChange, className = '', placeholder 
   function moveMonth(amount: number) { setNavDate(new Date(navDate.getFullYear(), navDate.getMonth() + amount, 1)) }
 
   return <div ref={rootRef} className="relative w-full">
-    <button type="button" disabled={disabled} aria-label={ariaLabel ? `${ariaLabel}: ${label}` : label} aria-invalid={ariaInvalid || undefined} aria-haspopup="dialog" aria-expanded={open} onClick={() => setOpen((current) => !current)} className={`ops-control ops-focus flex min-h-11 w-full items-center justify-between gap-3 px-3.5 text-left ${className}`}>
+    <button ref={triggerRef} type="button" disabled={disabled} aria-label={ariaLabel ? `${ariaLabel}: ${label}` : label} aria-required={ariaRequired || undefined} aria-invalid={ariaInvalid || undefined} aria-haspopup="dialog" aria-expanded={open} aria-controls={open ? calendarId : undefined} onKeyDown={(event) => { if (event.key === 'Escape' && open) { event.preventDefault(); event.stopPropagation(); setOpen(false); triggerRef.current?.focus() } }} onClick={() => setOpen((current) => !current)} className={`ops-control flex min-h-11 w-full items-center justify-between gap-3 px-3.5 text-left ${className}`}>
       <span className="flex min-w-0 items-center gap-2 truncate"><Icon name="calendar" className="h-4 w-4 shrink-0 text-slate-500" />{label}</span><Icon name="chevron-down" className={`h-4 w-4 shrink-0 text-slate-500 transition-transform ${open ? 'rotate-180' : ''}`} />
     </button>
-    {open && <div role="dialog" aria-label="Calendario" className={`ops-popover absolute top-full z-50 mt-2 w-[23rem] max-w-[calc(100vw-2rem)] overflow-x-auto p-4 ${align === 'right' ? 'right-0' : 'left-0'}`}>
+    <FloatingLayer anchorRef={rootRef} open={open} onDismiss={(reason) => { setOpen(false); if (reason === 'escape') triggerRef.current?.focus() }} id={calendarId} role="dialog" ariaLabel="Calendario" align={align === 'right' ? 'end' : 'start'} width={368} maxHeight={420} className="ops-popover w-[23rem] max-w-[calc(100vw-2rem)] overflow-x-auto p-4">
       <div className="flex items-center justify-between gap-2">
-        <button type="button" aria-label="Mes anterior" onClick={() => moveMonth(-1)} className="ops-focus inline-flex h-11 w-11 items-center justify-center rounded-lg text-slate-300 hover:bg-slate-800"><Icon name="chevron-left" className="h-4 w-4" /></button>
+        <button type="button" aria-label="Mes anterior" title="Mes anterior" onClick={() => moveMonth(-1)} className="ops-icon-button ops-focus"><Icon name="chevron-left" className="h-4 w-4" /></button>
         <p className="text-sm font-semibold text-white">{MONTHS[navDate.getMonth()]} {navDate.getFullYear()}</p>
-        <button type="button" aria-label="Mes siguiente" onClick={() => moveMonth(1)} className="ops-focus inline-flex h-11 w-11 items-center justify-center rounded-lg text-slate-300 hover:bg-slate-800"><Icon name="chevron-right" className="h-4 w-4" /></button>
+        <button type="button" aria-label="Mes siguiente" title="Mes siguiente" onClick={() => moveMonth(1)} className="ops-icon-button ops-focus"><Icon name="chevron-right" className="h-4 w-4" /></button>
       </div>
       <div className="mt-3 grid grid-cols-7 gap-1 text-center">{WEEKDAYS.map((day) => <span key={day} className="py-1 text-xs font-medium text-slate-500">{day}</span>)}
-        {cells.map(({ date, current }) => { const isSelected = selected && toValue(selected) === toValue(date); return <button key={toValue(date)} type="button" aria-label={date.toLocaleDateString('es-MX', { dateStyle: 'long' })} onClick={() => { onChange(toValue(date)); setOpen(false) }} className={`ops-focus inline-flex h-11 w-11 items-center justify-center rounded-lg text-sm text-white ${isSelected ? 'bg-sky-700 font-semibold' : current ? 'hover:bg-slate-800' : 'opacity-50 hover:bg-slate-800/60'}`}><span>{date.getDate()}</span></button> })}
+        {cells.map(({ date, current }) => { const isSelected = Boolean(selected && toValue(selected) === toValue(date)); const isBeforeMinimum = Boolean(minimum && date < minimum); return <button key={toValue(date)} type="button" disabled={isBeforeMinimum} aria-label={date.toLocaleDateString('es-MX', { dateStyle: 'long' })} aria-current={isSelected ? 'date' : undefined} data-selected={isSelected || undefined} onClick={() => { onChange(toValue(date)); setOpen(false); triggerRef.current?.focus() }} className={`ops-action ops-calendar-day ops-focus ${current ? '' : 'opacity-50'} ${isBeforeMinimum ? 'cursor-not-allowed opacity-30' : ''}`}><span>{date.getDate()}</span></button> })}
       </div>
-    </div>}
+    </FloatingLayer>
   </div>
 }

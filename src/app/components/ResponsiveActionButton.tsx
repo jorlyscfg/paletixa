@@ -8,7 +8,8 @@ type ResponsiveActionButtonProps = Omit<ButtonHTMLAttributes<HTMLButtonElement>,
   icon?: ActionIconName
   loading?: boolean
   loadingLabel?: string
-  mobileDisplay?: 'icon' | 'full-icon' | 'text'
+  iconOnly?: boolean
+  showLabel?: boolean
   'aria-label'?: string
 }
 
@@ -17,7 +18,8 @@ export function ResponsiveActionButton({
   icon,
   loading = false,
   loadingLabel,
-  mobileDisplay = 'icon',
+  iconOnly = false,
+  showLabel = false,
   className = '',
   disabled,
   children,
@@ -27,7 +29,8 @@ export function ResponsiveActionButton({
 }: ResponsiveActionButtonProps) {
   const currentLabel = loading ? loadingLabel ?? label : label
   const visibleLabel = loading ? loadingLabel ?? label : children ?? label
-  const iconOnly = mobileDisplay === 'icon'
+  const displaysLabel = !iconOnly && (!icon || showLabel)
+  const sizeClassName = displaysLabel ? 'min-h-11' : 'h-11 w-11 min-h-11 min-w-11 px-0'
 
   return <button
     {...buttonProps}
@@ -36,9 +39,9 @@ export function ResponsiveActionButton({
     aria-busy={loading || undefined}
     title={title ?? currentLabel}
     disabled={disabled || loading}
-    className={`ops-action ops-focus inline-flex items-center justify-center gap-2 ${iconOnly ? 'max-sm:h-11 max-sm:w-11 max-sm:px-0' : mobileDisplay === 'full-icon' ? 'max-sm:min-h-11 max-sm:w-full' : 'min-h-11'} ${className}`}
+    className={`ops-action ${displaysLabel ? '' : 'ops-icon-button'} ops-focus inline-flex items-center justify-center gap-2 ${sizeClassName} ${className}`}
   >
     {loading ? <span aria-hidden="true" className="h-4 w-4 animate-spin rounded-full border-2 border-current border-r-transparent" /> : icon ? <Icon name={icon} className="h-4 w-4 shrink-0" /> : null}
-    {mobileDisplay === 'text' ? visibleLabel : <span className="hidden sm:inline">{visibleLabel}</span>}
+    {displaysLabel && <span className="min-w-0 truncate">{visibleLabel}</span>}
   </button>
 }

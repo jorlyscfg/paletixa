@@ -7,7 +7,10 @@ type BrowserEnvironment = Readonly<
 const privilegedKeyPattern =
   /^(?:(?:VITE_)?INSFORGE_)?(?:ADMIN|API|SERVICE_ROLE)_?KEY$/i
 
-export function loadBrowserInsforgeConfig(environment: BrowserEnvironment) {
+export function loadBrowserInsforgeConfig(
+  environment: BrowserEnvironment,
+  isDevelopment = import.meta.env.DEV,
+) {
   const privilegedKey = Object.keys(environment).find((name) =>
     privilegedKeyPattern.test(name),
   )
@@ -16,7 +19,7 @@ export function loadBrowserInsforgeConfig(environment: BrowserEnvironment) {
     throw new Error(`Privileged InsForge key is not allowed in browser config: ${privilegedKey}`)
   }
 
-  const baseUrl = environment.VITE_INSFORGE_URL
+  const baseUrl = isDevelopment ? window.location.origin : environment.VITE_INSFORGE_URL
   const anonKey = environment.VITE_INSFORGE_ANON_KEY
 
   if (typeof baseUrl !== 'string' || typeof anonKey !== 'string') {

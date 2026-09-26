@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-labelledby="title desc">
+  <title id="title">Paletixa</title>
+  <desc id="desc">Monograma P de La Paleti'Xa en un icono adaptable</desc>
+  <rect width="512" height="512" fill="#fff8e7"/>
+  <circle cx="256" cy="256" r="180" fill="#d94770"/>
+  <path d="M211 152h82c61 0 96 35 96 88s-35 88-96 88h-32v42h-50V152Zm50 44v88h29c30 0 47-16 47-44s-17-44-47-44h-29Z" fill="#fff8e7"/>
+  <circle cx="136" cy="143" r="24" fill="#f5ad3f"/>
+  <circle cx="384" cy="369" r="23" fill="#9fe2ad"/>
+</svg>

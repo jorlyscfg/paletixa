@@ -31,6 +31,18 @@ type DetailRow = {
   quantity: number | string
   line_total_mxn: number | string
   context_label: string | null
+  line_kind: 'product' | 'category'
+  category_id: string | null
+  category_name: string | null
+  event_date: string | null
+  contact_name: string | null
+  contact_phone: string | null
+  contact_email: string | null
+  initial_payment_amount: number | string | null
+  initial_payment_method: string | null
+  final_payment_amount: number | string | null
+  final_payment_method: string | null
+  reservation_status: string | null
 }
 type SaleDetails = Record<string, unknown>
 
@@ -114,25 +126,12 @@ describe.skipIf(!repeatable)('shared sales ledger contracts', () => {
     expect(Number(items[0].unit_price_mxn)).toBe(10.5)
     expect(Number(items[0].line_total_mxn)).toBe(21)
     const contexts = await data<Record<string, unknown>[]>(client.database.from('sales').select('business_context').eq('id', pos[0].sale_id))
-    expect(contexts).toEqual([{ business_context: { customer_name: 'Contract POS', payment_method: 'cash' } }])
+    expect(contexts).toEqual([{ business_context: { customer_name: 'Contract POS', payment_method: 'cash', payment_currency: 'mxn', usd_mxn_rate: 15, received_amount_mxn: 21, change_mxn: 0 } }])
   }, 20_000)
 
-  it('accepts an event without an advance, rejects a positive advance without a method, and accepts a positive advance with a method', async () => {
+  it('rejects direct event sales so they can only be created by reservation completion', async () => {
     const eventDetails = { event_name: 'Contract Event', event_date: '2026-09-12', responsible_name: 'Contract Responsible' }
-    const noAdvance = await record(crypto.randomUUID(), 'event', [{ product_id: fixture.retailProductId, quantity: 3 }], eventDetails)
-    expect(Number(noAdvance[0].total_mxn)).toBe(31.5)
-
-    await expect(record(crypto.randomUUID(), 'event', [{ product_id: fixture.retailProductId, quantity: 3 }], {
-      ...eventDetails,
-      advance_amount_mxn: 250,
-    })).rejects.toThrow(/advance payment method/i)
-
-    const paidAdvance = await record(crypto.randomUUID(), 'event', [{ product_id: fixture.retailProductId, quantity: 3 }], {
-      ...eventDetails,
-      advance_amount_mxn: 250,
-      advance_payment_method: 'card',
-    })
-    expect(Number(paidAdvance[0].total_mxn)).toBe(31.5)
+    await expect(record(crypto.randomUUID(), 'event', [{ product_id: fixture.retailProductId, quantity: 3 }], eventDetails)).rejects.toThrow(/event reservation/i)
   }, 20_000)
 
   it('replays the same request without creating another sale and rejects payload conflicts', async () => {
@@ -152,8 +151,7 @@ describe.skipIf(!repeatable)('shared sales ledger contracts', () => {
     await expect(record(crypto.randomUUID(), 'pos', [{ product_id: fixture.retailProductId, quantity: 0 }], { payment_method: 'cash' })).rejects.toThrow(/positive integer/i)
     await expect(record(crypto.randomUUID(), 'pos', [{ product_id: crypto.randomUUID(), quantity: 1 }], { payment_method: 'cash' })).rejects.toThrow(/not found/i)
     await expect(record(crypto.randomUUID(), 'pos', [{ product_id: fixture.inactiveProductId, quantity: 1 }], { payment_method: 'cash' })).rejects.toThrow(/not found or inactive/i)
-    await expect(record(crypto.randomUUID(), 'event', [{ product_id: fixture.retailProductId, quantity: 1 }], { event_name: 'Bad Date', event_date: '2026-02-30', responsible_name: 'Tester', advance_payment_method: 'cash' })).rejects.toThrow(/ISO date/i)
-    await expect(record(crypto.randomUUID(), 'event', [{ product_id: fixture.retailProductId, quantity: 1 }], { event_name: 'Negative', event_date: '2026-09-12', responsible_name: 'Tester', advance_amount_mxn: -1, advance_payment_method: 'cash' })).rejects.toThrow(/negative/i)
+    await expect(record(crypto.randomUUID(), 'event', [{ product_id: fixture.retailProductId, quantity: 1 }], { event_name: 'Bad Date', event_date: '2026-02-30', responsible_name: 'Tester' })).rejects.toThrow(/event reservation/i)
   }, 20_000)
 
   it('aggregates all three channels and always returns the complete report shape', async () => {
@@ -163,10 +161,10 @@ describe.skipIf(!repeatable)('shared sales ledger contracts', () => {
     const after = Object.fromEntries(report.map((row) => [row.channel, row]))
     expect(Number(after.pos.sale_count) - Number(before.pos.sale_count)).toBe(2)
     expect(Number(after.wholesale.sale_count) - Number(before.wholesale.sale_count)).toBe(1)
-    expect(Number(after.event.sale_count) - Number(before.event.sale_count)).toBe(2)
+    expect(Number(after.event.sale_count) - Number(before.event.sale_count)).toBe(0)
     expect(Number(after.pos.total_mxn) - Number(before.pos.total_mxn)).toBe(31.5)
     expect(Number(after.wholesale.total_mxn) - Number(before.wholesale.total_mxn)).toBe(14.5)
-    expect(Number(after.event.total_mxn) - Number(before.event.total_mxn)).toBe(63)
+    expect(Number(after.event.total_mxn) - Number(before.event.total_mxn)).toBe(0)
   }, 20_000)
 
   it('returns safe detail rows for all channels and filters by date', async () => {
@@ -174,14 +172,15 @@ describe.skipIf(!repeatable)('shared sales ledger contracts', () => {
       p_from: reportFrom, p_to: reportTo, p_limit: 100,
     }))
     const fixtureRows = detail.filter((row) => ['Contract POS', 'Contract Wholesale', 'Contract Event'].includes(row.context_label ?? ''))
-    expect(fixtureRows.map((row) => row.channel)).toEqual(expect.arrayContaining(['pos', 'wholesale', 'event']))
+    expect(fixtureRows.map((row) => row.channel)).toEqual(expect.arrayContaining(['pos', 'wholesale']))
     expect(fixtureRows).toEqual(expect.arrayContaining([
       expect.objectContaining({ channel: 'pos', product_name: 'Ledger Mango', quantity: 2, line_total_mxn: 21, context_label: 'Contract POS' }),
       expect.objectContaining({ channel: 'wholesale', product_name: 'Ledger Mango', quantity: 2, line_total_mxn: 14.5, context_label: 'Contract Wholesale' }),
-      expect.objectContaining({ channel: 'event', product_name: 'Ledger Mango', quantity: 3, line_total_mxn: 31.5, context_label: 'Contract Event' }),
     ]))
     expect(Object.keys(fixtureRows[0])).toEqual([
       'sale_id', 'sale_date', 'channel', 'total_mxn', 'product_name', 'quantity', 'line_total_mxn', 'context_label',
+      'line_kind', 'category_id', 'category_name', 'event_date', 'contact_name', 'contact_phone', 'contact_email',
+      'initial_payment_amount', 'initial_payment_method', 'final_payment_amount', 'final_payment_method', 'reservation_status',
     ])
     const previousDay = new Date(new Date(reportFrom).getTime() - 24 * 60 * 60 * 1000).toISOString()
     const previousDetail = await data<DetailRow[]>(client.database.rpc('report_sales_detail', {

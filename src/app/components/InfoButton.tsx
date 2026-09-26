@@ -1,10 +1,11 @@
 import { useLayoutEffect, useRef } from 'react'
 import { createPortal } from 'react-dom'
 import type { ReactNode } from 'react'
+import { Icon } from './icons'
 
-type InfoButtonProps = { id: string; label: string; open: boolean; onToggle: () => void; children: ReactNode }
+type InfoButtonProps = { id: string; label: string; open: boolean; onToggle: () => void; children: ReactNode; className?: string }
 
-export function InfoButton({ id, label, open, onToggle, children }: InfoButtonProps) {
+export function InfoButton({ id, label, open, onToggle, children, className = '' }: InfoButtonProps) {
   const triggerRef = useRef<HTMLButtonElement>(null)
   const popoverRef = useRef<HTMLDivElement>(null)
 
@@ -29,5 +30,5 @@ export function InfoButton({ id, label, open, onToggle, children }: InfoButtonPr
 
   const popover = open && typeof document !== 'undefined' ? createPortal(<div ref={popoverRef} id={id} role="tooltip" style={{ position: 'fixed', visibility: 'hidden' }} className="ops-popover z-[70] p-4 text-sm leading-relaxed text-slate-300">{children}</div>, document.body) : null
 
-  return <span className="inline-flex"><button ref={triggerRef} type="button" aria-label={label} aria-expanded={open} aria-controls={id} aria-describedby={open ? id : undefined} onClick={onToggle} className="ops-focus inline-flex min-h-11 min-w-11 items-center justify-center text-slate-400 hover:text-white"><span aria-hidden="true" className="inline-flex h-5 w-5 items-center justify-center rounded-full border border-slate-600 text-xs font-semibold">i</span></button>{popover}</span>
+  return <span className="inline-flex"><button ref={triggerRef} type="button" aria-label={label} title={label} aria-expanded={open} aria-controls={id} aria-describedby={open ? id : undefined} onClick={onToggle} className={`ops-icon-button ops-focus border-transparent bg-transparent hover:border-transparent hover:bg-transparent active:bg-transparent ${className}`}><Icon name="info" className="h-5 w-5" /></button>{popover}</span>
 }

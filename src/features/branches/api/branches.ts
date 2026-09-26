@@ -21,6 +21,12 @@ export async function createBranch(name: string, requestId: string) {
   return commandResult(data)
 }
 
+export async function renameBranch(id: string, name: string, requestId: string) {
+  const { data, error } = await insforge.database.rpc('rename_branch', { p_branch_id: id, p_name: name, p_request_id: requestId })
+  if (error) throw error
+  return commandResult(data)
+}
+
 export async function setBranchStatus(id: string, status: Branch['status'], requestId: string) {
   const { data, error } = await insforge.database.rpc('set_branch_status', { p_branch_id: id, p_status: status, p_request_id: requestId })
   if (error) throw error

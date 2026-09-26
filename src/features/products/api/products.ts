@@ -1,10 +1,15 @@
 import { insforge } from '../../../lib/insforge'
 import { normalizeCapitalizedText } from '../../../lib/textNormalization'
+import { optimizeProductImage } from './productImageOptimizer'
+import { normalizeSku } from './productSku'
 import { normalizeProductTags, syncProductTags } from './productTags'
 
 export { MAX_PRODUCT_TAG_LENGTH, MAX_PRODUCT_TAGS, normalizeProductTags } from './productTags'
+export { ProductImageOptimizationError } from './productImageOptimizer'
+export { MAX_PRODUCT_SKU_LENGTH, normalizeSku, suggestProductSku, suggestUniqueProductSku } from './productSku'
 
 const PRODUCT_COLUMNS = 'id, name, sku, category_id, category:product_categories(id, name), retail_price_mxn, wholesale_price_mxn, active, tag_assignments:product_tag_assignments(tag:product_tags(name)), image_url, image_key, created_at, updated_at'
+const POS_PRODUCT_COLUMNS = 'id, name, sku, category_id, category:product_categories(id, name), retail_price_mxn, wholesale_price_mxn, active, image_url, image_key, created_at, updated_at'
 
 export const PRODUCT_IMAGE_BUCKET = 'product-images'
 export const PRODUCT_IMAGE_MAX_BYTES = 5 * 1024 * 1024
@@ -31,7 +36,7 @@ export type CreateProductInput = {
   sku: string
   categoryId: string
   retailPriceMxn: number
-  wholesalePriceMxn: number
+  wholesalePriceMxn?: number
   tags?: string[]
   active?: boolean
 }
@@ -78,18 +83,31 @@ function productText(value: unknown, field: string) {
   return normalized
 }
 
-function price(value: unknown, field: string) {
-  if (typeof value !== 'number' || !Number.isFinite(value) || value < 0) throw new Error(`${field} must be a non-negative number`)
-  return Math.round(value * 100) / 100
+function sku(value: unknown) {
+  if (typeof value !== 'string') throw new Error('SKU is required')
+  const normalized = normalizeSku(value)
+  if (normalized === '') throw new Error('SKU is required')
+  return normalized
+}
+
+function price(value: unknown, field: string, allowZero = false) {
+  if (typeof value !== 'number' || !Number.isFinite(value) || (allowZero ? value < 0 : value <= 0)) {
+    throw new Error(`${field} must be a ${allowZero ? 'non-negative' : 'positive'} number`)
+  }
+  const rounded = Math.round(value * 100) / 100
+  if (allowZero ? value > 0 && rounded <= 0 : rounded <= 0) {
+    throw new Error(`${field} must be a ${allowZero ? 'non-negative' : 'positive'} number`)
+  }
+  return rounded
 }
 
 function normalizeCreate(input: CreateProductInput) {
   return {
     name: productText(input.name, 'Product name'),
-    sku: productText(input.sku, 'SKU'),
+    sku: sku(input.sku),
     categoryId: requiredId(input.categoryId, 'Category ID'),
     retailPriceMxn: price(input.retailPriceMxn, 'Retail price'),
-    wholesalePriceMxn: price(input.wholesalePriceMxn, 'Wholesale price'),
+    wholesalePriceMxn: price(input.wholesalePriceMxn === undefined ? 0 : input.wholesalePriceMxn, 'Wholesale price', true),
     tags: normalizeProductTags(input.tags),
     active: input.active ?? true,
   }
@@ -98,10 +116,10 @@ function normalizeCreate(input: CreateProductInput) {
 function normalizeUpdate(input: UpdateProductInput) {
   const result: Record<string, string | number | boolean> = {}
   if (input.name !== undefined) result.name = productText(input.name, 'Product name')
-  if (input.sku !== undefined) result.sku = productText(input.sku, 'SKU')
+  if (input.sku !== undefined) result.sku = sku(input.sku)
   if (input.categoryId !== undefined) result.category_id = requiredId(input.categoryId, 'Category ID')
   if (input.retailPriceMxn !== undefined) result.retail_price_mxn = price(input.retailPriceMxn, 'Retail price')
-  if (input.wholesalePriceMxn !== undefined) result.wholesale_price_mxn = price(input.wholesalePriceMxn, 'Wholesale price')
+  if (input.wholesalePriceMxn !== undefined) result.wholesale_price_mxn = price(input.wholesalePriceMxn, 'Wholesale price', true)
   if (input.tags !== undefined) normalizeProductTags(input.tags)
   if (input.active !== undefined) {
     if (typeof input.active !== 'boolean') throw new Error('Active state must be boolean')
@@ -120,7 +138,7 @@ function mapProduct(data: unknown): Product {
   return {
     id: row.id,
     name: normalizeCapitalizedText(row.name),
-    sku: normalizeCapitalizedText(row.sku),
+    sku: normalizeSku(row.sku),
     category: normalizeCapitalizedText(category.name),
     categoryId: row.category_id,
     retailPriceMxn: Number(row.retail_price_mxn),
@@ -142,6 +160,15 @@ async function readProduct(productId: string): Promise<Product> {
 
 export async function listProducts(): Promise<Product[]> {
   const { data, error } = await insforge.database.from('products').select(PRODUCT_COLUMNS).order('name')
+  if (error) throw error
+  return (data ?? []).map((row) => mapProduct(row))
+}
+
+export async function listActiveProductsForPos(): Promise<Product[]> {
+  const { data, error } = await insforge.database.from('products')
+    .select(POS_PRODUCT_COLUMNS)
+    .eq('active', true)
+    .order('name')
   if (error) throw error
   return (data ?? []).map((row) => mapProduct(row))
 }
@@ -170,12 +197,6 @@ function operationError(message: string, errors: unknown[]) {
   return new Error(details.length > 0 ? `${message}: ${details.join('; ')}` : message)
 }
 
-function imageFileExtension(file: File) {
-  if (file.type === 'image/jpeg') return '.jpg'
-  if (file.type === 'image/png') return '.png'
-  return '.webp'
-}
-
 function validateProductImageFile(file: File) {
   if (!file || typeof file.type !== 'string' || !PRODUCT_IMAGE_MIME_TYPES.includes(file.type as typeof PRODUCT_IMAGE_MIME_TYPES[number])) {
     throw new Error('Product image must be a JPEG, PNG, or WebP file')
@@ -183,12 +204,12 @@ function validateProductImageFile(file: File) {
   if (file.size > PRODUCT_IMAGE_MAX_BYTES) throw new Error('Product image exceeds the 5 MB limit')
 }
 
-function createProductImageKey(productId: string, file: File) {
+function createProductImageKey(productId: string) {
   const randomUUID = globalThis.crypto?.randomUUID
   const suffix = typeof randomUUID === 'function'
     ? randomUUID.call(globalThis.crypto)
     : `${Date.now()}-${Math.random().toString(36).slice(2)}`
-  return `products/${productId}/${suffix}${imageFileExtension(file)}`
+  return `products/${productId}/${suffix}.webp`
 }
 
 async function removeStorageObject(key: string) {
@@ -209,8 +230,10 @@ async function updateProductImageReference(productId: string, image: ProductImag
 export async function uploadProductImage(productId: string, file: File): Promise<ProductImage> {
   const id = requiredId(productId, 'Product ID')
   validateProductImageFile(file)
-  const key = createProductImageKey(id, file)
-  const { data, error } = await insforge.storage.from(PRODUCT_IMAGE_BUCKET).upload(key, file)
+  const optimizedFile = await optimizeProductImage(file)
+  validateProductImageFile(optimizedFile)
+  const key = createProductImageKey(id)
+  const { data, error } = await insforge.storage.from(PRODUCT_IMAGE_BUCKET).upload(key, optimizedFile)
 
   if (error) {
     if (data?.key) {

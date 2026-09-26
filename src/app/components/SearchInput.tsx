@@ -14,7 +14,7 @@ export function SearchInput({ value, onChange, label, containerClassName = '', c
 
   return <div className={`relative ${containerClassName}`}>
     <label htmlFor={inputId} className="sr-only">{label}</label>
-    <input {...inputProps} id={inputId} type="text" role="searchbox" maxLength={maxLength} value={value} onChange={(event) => onChange(event.target.value)} className={`ops-control ops-focus min-h-11 w-full pl-10 ${className}`} />
+    <input {...inputProps} id={inputId} type="text" role="searchbox" maxLength={maxLength} value={value} onChange={(event) => onChange(event.target.value)} className={`ops-control w-full pl-10 ${className}`} />
     <IconSearch />
   </div>
 }
