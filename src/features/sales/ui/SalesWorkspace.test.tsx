@@ -2,6 +2,7 @@ import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-li
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { AppProviders } from '../../../app/AppProviders'
 import { createAdminSessionStorageKey } from '../../../app/sessionPersistence'
+import { NavigationDrawerOpenContext } from '../../../app/navigationDrawerContext'
 import { AdminBoundary } from '../../auth/ui/AdminBoundary'
 import * as authApi from '../../auth/api/adminAccess'
 import * as productApi from '../../products/api/products'
@@ -105,7 +106,7 @@ describe('sales workspace', () => {
     vi.mocked(productApi.listActiveProductsForPos).mockResolvedValue([])
     renderProtected()
     expect(await screen.findByText('No hay productos activos en el catálogo. Agrega un producto activo antes de registrar una venta.')).toBeInTheDocument()
-    expect(screen.getByTestId('pos-catalog-scroll')).toHaveClass('min-h-0', 'lg:flex-1', 'lg:overflow-y-auto', 'lg:overscroll-contain')
+    expect(screen.getByTestId('pos-catalog-scroll')).toHaveClass('ops-scroll-region', 'min-h-0', 'flex-1', 'overflow-y-auto', 'overscroll-contain')
   })
 
   it('keeps branch identity internal without showing the POS branch badge or heading block', async () => {
@@ -123,6 +124,65 @@ describe('sales workspace', () => {
     expect(screen.queryByText('Productos para mostrador')).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Explicar selección de productos' })).not.toBeInTheDocument()
     expect(screen.getByRole('tabpanel', { name: 'Productos disponibles' })).toBeInTheDocument()
+  })
+
+  it('keeps the POS product catalog bounded by its own vertical scroller', async () => {
+    renderProtected('pos')
+    await screen.findByRole('heading', { name: 'Mango' })
+
+    const catalogColumn = screen.getByTestId('pos-catalog-column')
+    const catalog = screen.getByRole('tabpanel', { name: 'Productos disponibles' })
+    const scroller = screen.getByTestId('pos-catalog-scroll')
+    const catalogHeader = screen.getByTestId('catalog-controls-header')
+    expect(catalogColumn).toHaveClass('min-h-0', 'flex', 'flex-col', 'overflow-hidden')
+    expect(catalog).toHaveClass('mt-2', 'flex', 'min-h-0', 'flex-1', 'flex-col')
+    expect(catalog).not.toHaveClass('lg:flex')
+    expect(catalogHeader).toContainElement(screen.getByRole('heading', { name: 'Catálogo de productos' }))
+    expect(screen.getAllByTestId('sales-product-card')[0]).toHaveAttribute('data-catalog-selection-card', '')
+    expect(screen.getAllByTestId('pos-price-pair')[0]).toHaveAttribute('data-catalog-price-pair', '')
+    expect(screen.getAllByTestId('pos-price-pair')[0].querySelectorAll('[data-price-slot]')).toHaveLength(2)
+    expect(scroller).toHaveClass('ops-scroll-region', 'min-h-0', 'flex-1', 'overflow-y-auto', 'overscroll-contain')
+    expect(scroller).toContainElement(screen.getAllByTestId('sales-product-card')[0])
+    expect(scroller).not.toContainElement(screen.getByRole('searchbox'))
+  })
+
+  it('matches the cashier workspace bottom padding without changing the in-flow catalog footer', async () => {
+    render(<AppProviders><AdminBoundary><SalesWorkspace channel="pos" initialViewMode="products" mobileFooterBleed="cashier" /></AdminBoundary></AppProviders>)
+    await screen.findByRole('heading', { name: 'Mango' })
+    fireEvent.click(screen.getByRole('button', { name: 'Agregar Mango a la venta' }))
+
+    const workspace = screen.getByTestId('pos-workspace')
+    const catalog = screen.getByTestId('pos-catalog-scroll')
+    const summary = screen.getByTestId('pos-mobile-summary-bar')
+    const summaryDetails = screen.getByTestId('pos-mobile-summary-details')
+    expect(workspace).toHaveClass('-mb-3', 'sm:-mb-4', 'lg:mb-0')
+    expect(catalog).toHaveClass('min-h-0', 'flex-1', 'overflow-y-auto', 'overscroll-contain')
+    expect(summary.parentElement).toBe(workspace)
+    expect(summary).not.toHaveClass('fixed', 'absolute', 'ops-mobile-action-bar')
+    expect(summaryDetails).toHaveClass('flex', 'flex-wrap', 'items-baseline', 'justify-between', 'gap-x-3', 'gap-y-1')
+    expect(summaryDetails.children).toHaveLength(2)
+    expect(within(summaryDetails).getByText('1 artículo')).toBeInTheDocument()
+    expect(within(summaryDetails).getByText(/42\.50/)).toBeInTheDocument()
+  })
+
+  it('isolates the in-flow POS summary while the navigation drawer is open', async () => {
+    const setDrawerOpen = vi.fn()
+    const withDrawerState = (isOpen: boolean) => <AppProviders><AdminBoundary><NavigationDrawerOpenContext.Provider value={{ isOpen, setIsOpen: setDrawerOpen }}><SalesWorkspace channel="pos" initialViewMode="products" /></NavigationDrawerOpenContext.Provider></AdminBoundary></AppProviders>
+    const view = render(withDrawerState(true))
+    await screen.findByRole('heading', { name: 'Mango' })
+    fireEvent.click(screen.getByRole('button', { name: 'Agregar Mango a la venta' }))
+
+    const summary = screen.getByTestId('pos-mobile-summary-bar')
+    expect(summary).toHaveAttribute('aria-hidden', 'true')
+    expect(summary).toHaveAttribute('inert')
+    expect(screen.queryByRole('button', { name: 'Revisar venta' })).not.toBeInTheDocument()
+
+    view.rerender(withDrawerState(false))
+
+    const restoredSummary = screen.getByTestId('pos-mobile-summary-bar')
+    expect(restoredSummary).toHaveAttribute('aria-hidden', 'false')
+    expect(restoredSummary).not.toHaveAttribute('inert')
+    expect(within(restoredSummary).getByRole('button', { name: 'Revisar venta' })).toBeEnabled()
   })
 
   it('recovers when the catalog request fails', async () => {
@@ -207,25 +267,38 @@ describe('sales workspace', () => {
      const reviewButton = screen.getByRole('button', { name: 'Revisar venta' })
        expect(reviewButton).toBeDisabled()
        expect(screen.getByTestId('pos-workspace')).toHaveClass('ops-workspace-frame', 'min-w-0')
-      expect(screen.getByTestId('pos-workspace')).not.toHaveClass('h-[calc(100dvh-4rem-1.5rem)]', 'min-h-0', 'overflow-hidden')
+      expect(screen.getByTestId('pos-workspace')).not.toHaveClass('h-[calc(100dvh-4rem-1.5rem)]', 'sm:h-[calc(100dvh-4rem-2rem)]')
+      expect(screen.getByTestId('pos-workspace')).toHaveClass('min-h-0', 'flex-1', 'overflow-hidden')
       expect(screen.getByTestId('pos-sales-form')).toHaveClass('grid')
+      expect(screen.getByTestId('pos-sales-form')).not.toHaveClass('pb-[calc(8rem+env(safe-area-inset-bottom))]', 'lg:pb-0')
       expect(screen.getByTestId('pos-sales-form')).toHaveClass('lg:grid-cols-[minmax(0,1fr)_minmax(19rem,24rem)]', 'lg:min-h-0', 'lg:flex-1', 'lg:overflow-hidden')
-     expect(screen.getByTestId('pos-catalog-column')).toHaveClass('lg:flex', 'lg:min-h-0', 'lg:flex-col', 'lg:overflow-hidden')
+     expect(screen.getByTestId('pos-catalog-column')).toHaveClass('flex', 'min-h-0', 'flex-col', 'overflow-hidden')
      expect(screen.getByTestId('pos-summary-column')).toHaveClass('hidden', 'lg:flex')
       const catalogScroll = screen.getByTestId('pos-catalog-scroll')
-      expect(catalogScroll).toHaveClass('min-h-0', 'lg:flex-1', 'lg:overflow-y-auto', 'lg:overscroll-contain')
+      expect(catalogScroll).toHaveClass('min-h-0', 'flex-1', 'overflow-y-auto', 'overscroll-contain')
       expect(catalogScroll).toHaveClass('ops-scroll-region')
      expect(catalogScroll).toContainElement(screen.getAllByTestId('sales-product-card')[0])
      expect(catalogScroll).not.toContainElement(screen.getByRole('searchbox'))
 
     fireEvent.click(screen.getByRole('button', { name: 'Agregar Mango a la venta' }))
-    expect(screen.getByRole('button', { name: 'Revisar venta' })).toBeEnabled()
-     fireEvent.click(screen.getByRole('button', { name: 'Revisar venta' }))
+    const mobileSummaryBar = screen.getByTestId('pos-mobile-summary-bar')
+    const catalogWorkspace = screen.getByTestId('pos-workspace')
+    expect(catalogWorkspace).toHaveClass('-mb-4', 'sm:-mb-6', 'lg:mb-0')
+    expect(mobileSummaryBar).toHaveClass('shrink-0', 'mt-2', 'border-t', 'lg:hidden')
+    expect(mobileSummaryBar).not.toHaveClass('fixed', 'z-30', 'ops-mobile-action-bar')
+    expect(mobileSummaryBar.parentElement).toBe(catalogWorkspace)
+    expect(mobileSummaryBar.previousElementSibling).toBe(screen.getByTestId('pos-sales-form'))
+    expect(catalogWorkspace.lastElementChild).toBe(mobileSummaryBar)
+    expect(within(mobileSummaryBar).getByText('1 artículo')).toBeInTheDocument()
+    expect(within(mobileSummaryBar).getByText(/42\.50/)).toBeInTheDocument()
+    expect(within(mobileSummaryBar).getByRole('button', { name: 'Revisar venta' })).toBeEnabled()
+    fireEvent.click(screen.getByRole('button', { name: 'Revisar venta' }))
 
       expect(screen.getByTestId('pos-mobile-review-header')).toBeInTheDocument()
       expect(screen.getByText('Paso 2 de 2')).toBeInTheDocument()
      const workspace = screen.getByTestId('pos-workspace')
-     expect(workspace).toHaveClass('flex', 'h-[calc(100dvh-4rem-1.5rem)]', 'sm:h-[calc(100dvh-4rem-2rem)]', 'min-h-0', 'flex-col', 'overflow-hidden')
+     expect(workspace).toHaveClass('flex', 'min-h-0', 'flex-1', 'flex-col', 'overflow-hidden', 'pb-[calc(1rem+env(safe-area-inset-bottom))]', 'sm:pb-[calc(1.25rem+env(safe-area-inset-bottom))]')
+     expect(workspace).not.toHaveClass('h-[calc(100dvh-4rem-1.5rem)]', 'sm:h-[calc(100dvh-4rem-2rem)]')
       expect(screen.getByTestId('pos-catalog-column')).toHaveClass('hidden', 'lg:flex')
       const form = screen.getByTestId('pos-sales-form')
       expect(form).toHaveClass('flex', 'flex-col', 'min-h-0', 'flex-1', 'overflow-hidden', 'lg:grid', 'lg:grid-cols-[minmax(0,1fr)_minmax(19rem,24rem)]')
@@ -262,7 +335,7 @@ describe('sales workspace', () => {
     expect(screen.queryByTestId('pos-mobile-review-header')).not.toBeInTheDocument()
      expect(screen.getByRole('button', { name: 'Revisar venta' })).toBeEnabled()
      expect(screen.getByTestId('pos-selected-lines')).not.toHaveClass('overflow-y-auto', 'overscroll-contain', 'flex-1')
-     expect(screen.getByTestId('pos-mobile-summary-bar')).toHaveClass('ops-mobile-action-bar', 'lg:hidden')
+     expect(screen.getByTestId('pos-mobile-summary-bar')).toHaveClass('shrink-0', 'lg:hidden')
   })
 
    it('does not add the mobile POS checkout controls to non-POS channels', async () => {

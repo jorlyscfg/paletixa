@@ -11,7 +11,7 @@ vi.mock('../api/catalog', () => ({ listPublicWholesaleCatalog: api.listCatalog }
 vi.mock('../api/orders', () => ({ createWholesaleCustomerOrder: api.create, updateWholesaleCustomerOrder: api.update, listWholesaleCustomerOrders: api.listOrders, reorderWholesaleCustomerOrder: api.reorder, cancelWholesaleCustomerOrder: api.cancel, deleteWholesaleCustomerOrder: api.delete }))
 vi.mock('../api/transferTickets', () => ({ uploadWholesaleTransferTicket: api.upload, refreshWholesaleTransferTicketUrl: api.refreshTicket, removeWholesaleTransferTicket: api.remove, cleanupWholesaleTransferTickets: api.cleanupTickets }))
 vi.mock('../api/realtime', () => ({ subscribeToWholesaleOrderEvents: api.subscribe }))
-import { WholesaleCustomerPortal } from './WholesaleCustomerPortal'
+import { DraftCatalog, WholesaleCustomerPortal } from './WholesaleCustomerPortal'
 
 const session = { sessionToken: 'session-token', customer: { id: 'customer-1', name: 'Tienda La Plaza', email: null }, expiresAt: '2099-09-22T00:00:00Z' } as const
 const catalog = [{ id: 'product-1', name: 'Mango', sku: 'M-01', categoryId: 'category-1', category: 'Paletas', retailPriceMxn: 12.5, wholesalePriceMxn: 10, imageUrl: 'https://cdn.example.com/mango.jpg' }]
@@ -83,6 +83,22 @@ describe('WholesaleCustomerPortal', () => {
     if (!realtimeListener) throw new Error('Realtime listener was not registered')
     realtimeListener(message)
   }
+
+  it('keeps catalog parity opt-in so the customer catalog retains its existing presentation', () => {
+    const draft = { reorderFromOrderId: null, items: {}, paymentMethod: 'cash' as const, transferTicket: null }
+    const onChange = vi.fn()
+    const view = render(<DraftCatalog draft={draft} catalog={catalog} showPortalTabs={false} onChange={onChange} />)
+
+    expect(screen.queryByTestId('catalog-controls-header')).not.toBeInTheDocument()
+    expect(screen.getByTestId('wholesale-category-card')).not.toHaveAttribute('data-catalog-selection-card')
+
+    view.rerender(<DraftCatalog draft={draft} catalog={catalog} showPortalTabs={false} presentationVariant="admin" onChange={onChange} />)
+
+    expect(screen.getByTestId('catalog-controls-header')).toBeInTheDocument()
+    expect(screen.getByTestId('wholesale-category-card')).toHaveAttribute('data-catalog-selection-card', '')
+    expect(screen.getByTestId('wholesale-price-pair')).toHaveTextContent('Menudeo')
+    expect(screen.getByTestId('wholesale-price-pair')).toHaveTextContent('Mayorista')
+  })
 
   it('keeps customer login separate from the admin boundary and stores a dedicated session', async () => {
     api.login.mockResolvedValue({ authenticated: true, ...session })

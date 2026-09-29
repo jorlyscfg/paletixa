@@ -13,7 +13,7 @@ vi.mock('../api/posShifts', () => ({
   openPosShift: shiftApi.openPosShift,
   closePosShift: shiftApi.closePosShift,
 }))
-vi.mock('./SalesWorkspace', () => ({ SalesWorkspace: () => <div data-testid="sales-workspace" /> }))
+vi.mock('./SalesWorkspace', () => ({ SalesWorkspace: ({ mobileFooterBleed }: { mobileFooterBleed?: 'admin' | 'cashier' }) => <div data-testid="sales-workspace" data-mobile-footer-bleed={mobileFooterBleed} /> }))
 
 function ShiftHeaderProbe({ onShiftClosed, onLogout = defaultLogout }: { onShiftClosed?: () => Promise<void>; onLogout?: () => Promise<void> }) {
   const [state, setState] = useState<PosShiftHeaderState | null>(null)
@@ -84,8 +84,19 @@ describe('POS shift workspace', () => {
     fireEvent.click(within(screen.getByRole('dialog', { name: 'Apertura de turno' })).getByRole('button', { name: 'Abrir turno' }))
     const salesWorkspace = await screen.findByTestId('sales-workspace')
     expect(salesWorkspace).toBeInTheDocument()
-    expect(salesWorkspace.parentElement).toHaveClass('flex', 'h-full', 'min-h-0', 'flex-1', 'flex-col', 'overflow-hidden')
+    expect(salesWorkspace.parentElement).toHaveClass('flex', 'h-full', 'min-h-0', 'flex-1', 'flex-col', 'overflow-visible')
     expect(shiftApi.openPosShift).toHaveBeenCalledWith({ initialCashMxn: 600, usdMxnRate: 17.25 })
+  })
+
+  it('passes cashier bottom-spacing to an overflow-visible shift frame', async () => {
+    shiftApi.getActivePosShift.mockResolvedValue(shift)
+    render(<ShiftHeaderProbe />)
+
+    const salesWorkspace = await screen.findByTestId('sales-workspace')
+    const shiftFrame = salesWorkspace.parentElement!
+    expect(salesWorkspace).toHaveAttribute('data-mobile-footer-bleed', 'cashier')
+    expect(shiftFrame).toHaveClass('h-full', 'overflow-visible')
+    expect(shiftFrame).not.toHaveClass('overflow-hidden')
   })
 
   it('keeps the opening modal open for validation errors and API failures', async () => {

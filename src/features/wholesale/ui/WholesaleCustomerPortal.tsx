@@ -1,4 +1,5 @@
 import { type ChangeEvent, type FormEvent, type KeyboardEvent, type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { CatalogControlsHeader, CatalogPricePair, CatalogSelectionCard } from '../../../app/components/CatalogPresentation'
 import { CatalogImageTile } from '../../../app/components/CatalogImageTile'
 import { InfoButton } from '../../../app/components/InfoButton'
 import { MobileBottomActionBar } from '../../../app/components/MobileBottomActionBar'
@@ -142,7 +143,7 @@ function CustomerLogin({ onLogin }: { onLogin: (session: WholesaleCustomerSessio
   </main>
 }
 
-export function DraftCatalog({ draft, catalog, portalTab = 'catalog', onChange, onPortalTabChange, showPortalTabs = true, formatMoney = formatWholesaleMoney }: { draft: WholesaleDraft; catalog: WholesaleCatalogProduct[]; portalTab?: PortalTab; onChange: (items: Record<string, number>) => void; onPortalTabChange?: (tab: PortalTab) => void; showPortalTabs?: boolean; formatMoney?: MoneyFormatter }) {
+export function DraftCatalog({ draft, catalog, portalTab = 'catalog', onChange, onPortalTabChange, showPortalTabs = true, formatMoney = formatWholesaleMoney, presentationVariant = 'customer' }: { draft: WholesaleDraft; catalog: WholesaleCatalogProduct[]; portalTab?: PortalTab; onChange: (items: Record<string, number>) => void; onPortalTabChange?: (tab: PortalTab) => void; showPortalTabs?: boolean; formatMoney?: MoneyFormatter; presentationVariant?: 'customer' | 'admin' }) {
   const [query, setQuery] = useState('')
   const [selectedCategory, setSelectedCategory] = useState(ALL_CATEGORIES)
   const [viewMode, setViewMode] = useState<'products' | 'categories'>(() => draft.reorderFromOrderId ? 'products' : 'categories')
@@ -188,8 +189,32 @@ export function DraftCatalog({ draft, catalog, portalTab = 'catalog', onChange, 
     setSelectedCategory(ALL_CATEGORIES)
   }
 
-  return <section aria-labelledby="wholesale-catalog-title" className="flex min-h-0 min-w-0 flex-1 flex-col gap-4">
-    <div className="ops-module-header flex min-w-0 shrink-0 flex-col gap-3 border-b border-slate-800 pb-4 sm:flex-row sm:items-center">
+  const adminPresentation = presentationVariant === 'admin'
+  const catalogScrollClass = adminPresentation
+    ? 'ops-scroll-region min-h-0 flex-1 overflow-y-auto overscroll-contain'
+    : 'ops-scroll-region min-h-0 max-h-[32rem] flex-1 overflow-y-auto overscroll-contain pr-1 lg:min-h-0 lg:flex-1 lg:max-h-none lg:overflow-y-auto lg:overscroll-contain'
+
+  return <section aria-labelledby="wholesale-catalog-title" className={`flex min-h-0 min-w-0 flex-1 flex-col ${adminPresentation ? 'gap-3' : 'gap-4'}`}>
+    {adminPresentation ? <CatalogControlsHeader
+      toolbar={<>
+        <SearchInput value={query} onChange={setQuery} label="Buscar productos" placeholder="Buscar producto, SKU o categoría" containerClassName="min-w-0 flex-1" />
+        <div className="flex shrink-0 items-center justify-end gap-1">
+          <div role="tablist" aria-label="Vista de catálogo" className="flex shrink-0 items-center gap-1">
+            <ResponsiveActionButton type="button" role="tab" aria-selected={viewMode === 'products'} label="Vista por producto" icon="catalog" iconOnly className="ops-tab" onClick={() => setViewMode('products')} />
+            <ResponsiveActionButton type="button" role="tab" aria-selected={viewMode === 'categories'} label="Vista por categoría" icon="package" iconOnly className="ops-tab" onClick={() => setViewMode('categories')} />
+          </div>
+          {showPortalTabs && onPortalTabChange && <PortalTabs activeTab={portalTab} onChange={onPortalTabChange} />}
+        </div>
+      </>}
+      categoryFilters={catalog.length > 0 && viewMode === 'products' && <div role="tablist" aria-label="Categorías de productos" className="ops-horizontal-scroll flex min-w-0 gap-2 overflow-x-auto pb-1">
+        {categories.map((category) => <ResponsiveActionButton key={category} type="button" role="tab" aria-selected={activeCategory === category} label={category} onClick={() => setSelectedCategory(category)} className="ops-tab shrink-0 px-4 text-xs">{category}</ResponsiveActionButton>)}
+      </div>}
+      titleId="wholesale-catalog-title"
+      title="Arma tu pedido"
+      info={<InfoButton id="wholesale-catalog-info" label="Explicar selección de productos" open={catalogInfoOpen} onToggle={() => setCatalogInfoOpen((current) => !current)}>Toca una tarjeta para agregar una unidad. Ajusta la cantidad exacta desde el carrito.</InfoButton>}
+      sectionTitle={catalog.length > 0 ? viewMode === 'categories' ? 'Categorías disponibles' : 'Productos disponibles' : undefined}
+      count={catalog.length > 0 ? viewMode === 'categories' ? `${visibleCategories.length} mostradas` : `${visibleCatalog.length} mostrados` : undefined}
+    /> : <div className="ops-module-header flex min-w-0 shrink-0 flex-col gap-3 border-b border-slate-800 pb-4 sm:flex-row sm:items-center">
       <div className="flex min-w-0 items-center gap-1 sm:shrink-0">
         <div>
           <p className="text-xs font-bold uppercase tracking-[0.12em] text-sky-400">Catálogo</p>
@@ -207,9 +232,9 @@ export function DraftCatalog({ draft, catalog, portalTab = 'catalog', onChange, 
           {showPortalTabs && onPortalTabChange && <PortalTabs activeTab={portalTab} onChange={onPortalTabChange} />}
         </div>
       </div>
-    </div>
+    </div>}
 
-    {catalog.length > 0 && <div className="grid shrink-0 gap-3">
+    {!adminPresentation && catalog.length > 0 && <div className="grid shrink-0 gap-3">
        {viewMode === 'products' && <div role="tablist" aria-label="Categorías de productos" className="ops-horizontal-scroll flex min-w-0 gap-2 overflow-x-auto pb-1">
          {categories.map((category) => <ResponsiveActionButton key={category} type="button" role="tab" aria-selected={activeCategory === category} label={category} onClick={() => setSelectedCategory(category)} className="ops-tab shrink-0 px-4 text-xs">{category}</ResponsiveActionButton>)}
       </div>}
@@ -222,7 +247,7 @@ export function DraftCatalog({ draft, catalog, portalTab = 'catalog', onChange, 
      {catalog.length === 0 ? <p role="status" className="ops-state ops-state-empty rounded-2xl border border-dashed border-slate-700 bg-slate-900/40 p-8 text-center text-sm text-slate-300">No hay productos disponibles para armar un pedido.</p> : viewMode === 'categories' && visibleCategories.length === 0 ? <div className="ops-state ops-state-filtered-empty rounded-2xl border border-dashed border-slate-700 bg-slate-900/40 p-8 text-center">
       <p className="text-sm font-semibold text-slate-300">No hay categorías que coincidan con esta búsqueda.</p>
       <ResponsiveActionButton type="button" label="Limpiar filtros" icon="close" onClick={clearFilters} className="mt-4" />
-     </div> : viewMode === 'categories' ? <div data-testid="wholesale-catalog-scroll" className="ops-scroll-region min-h-0 max-h-[32rem] flex-1 overflow-y-auto overscroll-contain pr-1 lg:min-h-0 lg:flex-1 lg:max-h-none lg:overflow-y-auto lg:overscroll-contain">
+     </div> : viewMode === 'categories' ? <div data-testid="wholesale-catalog-scroll" className={catalogScrollClass}>
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-4">
         {visibleCategories.map((category) => {
           const quantity = getWholesaleDraftCategoryQuantity(draft, catalog, category.id)
@@ -231,7 +256,26 @@ export function DraftCatalog({ draft, catalog, portalTab = 'catalog', onChange, 
           const unavailable = prices.retailPriceMxn === null || unitPrice === null
           const cardDisabled = unavailable
           const categoryLabel = unavailable ? `Categoría ${category.name} sin precio uniforme` : `${quantity > 0 ? 'Agregar otra unidad de' : 'Agregar'} categoría ${category.name} al pedido`
-          return <article
+          return adminPresentation ? <CatalogSelectionCard
+            key={category.id}
+            dataTestId="wholesale-category-card"
+            label={categoryLabel}
+            disabled={cardDisabled}
+            imageSrc={category.products.find((product) => product.imageUrl)?.imageUrl ?? null}
+            imageAlt={`Categoría ${category.name}`}
+            imageFallback={<div className="flex h-full w-full flex-col items-center justify-center gap-2 text-slate-500"><Icon name="package" className="h-8 w-8" /><span className="text-[10px] font-bold uppercase tracking-wider">Imagen pendiente</span></div>}
+            badge={quantity > 0 && <span className="absolute right-2 top-2 rounded-full border border-sky-400/40 bg-sky-500/20 px-2 py-1 text-[10px] font-black text-white">{quantity} en el carrito</span>}
+            title={category.name}
+            metadata={`${category.products.length} ${category.products.length === 1 ? 'producto' : 'productos'}`}
+            pricePair={<CatalogPricePair
+              dataTestId="wholesale-price-pair"
+              retailValue={prices.retailPriceMxn === null ? '—' : formatMoney(prices.retailPriceMxn)}
+              wholesaleValue={prices.wholesalePriceMxn === null ? <span className="text-slate-400">Sin precio mayorista</span> : formatMoney(prices.wholesalePriceMxn)}
+              active={quantity > 0 && unitPrice !== null ? unitPrice === prices.wholesalePriceMxn && prices.wholesalePriceMxn !== null ? 'wholesale' : 'retail' : undefined}
+            />}
+            notice={prices.retailPriceMxn === null ? 'Precio requiere revisión' : undefined}
+            onSelect={() => addCategory(category.id)}
+          /> : <article
             key={category.id}
             data-testid="wholesale-category-card"
             role="button"
@@ -259,10 +303,10 @@ export function DraftCatalog({ draft, catalog, portalTab = 'catalog', onChange, 
           </article>
         })}
       </div>
-      </div> : visibleCatalog.length === 0 ? <div className="ops-state ops-state-filtered-empty rounded-2xl border border-dashed border-slate-700 bg-slate-900/40 p-8 text-center">
+     </div> : visibleCatalog.length === 0 ? <div className="ops-state ops-state-filtered-empty rounded-2xl border border-dashed border-slate-700 bg-slate-900/40 p-8 text-center">
       <p className="text-sm font-semibold text-slate-300">No hay productos que coincidan con estos filtros.</p>
       <ResponsiveActionButton type="button" label="Limpiar filtros" icon="close" onClick={clearFilters} className="mt-4" />
-     </div> : <div data-testid="wholesale-catalog-scroll" className="ops-scroll-region min-h-0 max-h-[32rem] flex-1 overflow-y-auto overscroll-contain pr-1 lg:min-h-0 lg:flex-1 lg:max-h-none lg:overflow-y-auto lg:overscroll-contain">
+     </div> : <div data-testid="wholesale-catalog-scroll" className={catalogScrollClass}>
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-4">
         {visibleCatalog.map((product) => {
           const quantity = draft.items[product.id] ?? 0
@@ -270,7 +314,24 @@ export function DraftCatalog({ draft, catalog, portalTab = 'catalog', onChange, 
           const hasAppliedQuantity = categoryQuantity > 0
           const unitPrice = hasAppliedQuantity ? getWholesaleCatalogPrice(product, categoryQuantity) : product.retailPriceMxn
           const cardLabel = `${quantity > 0 ? 'Agregar otra unidad de' : 'Agregar'} ${product.name} al pedido`
-          return <article
+          return adminPresentation ? <CatalogSelectionCard
+            key={product.id}
+            dataTestId="wholesale-product-card"
+            label={cardLabel}
+            imageSrc={product.imageUrl}
+            imageAlt={product.name}
+            imageClassName="transition-transform duration-200 group-hover:scale-105"
+            badge={quantity > 0 && <span className="absolute right-2 top-2 rounded-full border border-sky-400/40 bg-sky-500/20 px-2 py-1 text-[10px] font-black text-white">{quantity} en el carrito</span>}
+            title={product.name}
+            metadata={`${product.category} · ${product.sku}`}
+            pricePair={<CatalogPricePair
+              dataTestId="wholesale-price-pair"
+              retailValue={formatMoney(product.retailPriceMxn)}
+              wholesaleValue={product.wholesalePriceMxn > 0 ? formatMoney(product.wholesalePriceMxn) : <span className="text-slate-400">Sin precio mayorista</span>}
+              active={hasAppliedQuantity ? unitPrice === product.wholesalePriceMxn && product.wholesalePriceMxn > 0 ? 'wholesale' : 'retail' : undefined}
+            />}
+            onSelect={() => addProduct(product.id)}
+          /> : <article
             key={product.id}
             data-testid="wholesale-product-card"
             role="button"

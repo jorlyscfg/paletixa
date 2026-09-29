@@ -47,7 +47,7 @@ export function formatEventCreatedDate(value: string) {
 const eventMoneyFormatter = new Intl.NumberFormat('en-US', { maximumFractionDigits: 0 })
 
 export function formatEventMoney(value: number) {
-  return `$${eventMoneyFormatter.format(value)}`
+  return `$${eventMoneyFormatter.format(value)} MXN`
 }
 
 export function createEmptyEventForm(): EventFormState {

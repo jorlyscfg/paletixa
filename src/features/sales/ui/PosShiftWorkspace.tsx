@@ -315,7 +315,7 @@ export function PosShiftWorkspace({ branchId, branchName, cashierName, onHeaderS
     {cashControlModalOpen && closedShift && <ShiftControlModal shift={closedShift} closed onClose={() => setCashControlModalOpen(false)} dailySales={dailySales} dailySalesState={dailySalesState} dailySalesError={dailySalesError} onRetryDailySales={() => void loadDailySales()} />}
   </div>
 
-  return <div data-branch-id={branchId} className="flex h-full min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
+  return <div data-branch-id={branchId} className="flex h-full min-h-0 min-w-0 flex-1 flex-col overflow-visible">
     {closeModalOpen && <Modal
       title="Cerrar Turno"
       closeLabel="Cancelar cierre"
@@ -338,6 +338,6 @@ export function PosShiftWorkspace({ branchId, branchName, cashierName, onHeaderS
       </form>
     </Modal>}
     {cashControlModalOpen && <ShiftControlModal shift={shift} closed={false} onClose={() => setCashControlModalOpen(false)} dailySales={dailySales} dailySalesState={dailySalesState} dailySalesError={dailySalesError} onRetryDailySales={() => void loadDailySales()} />}
-    <SalesWorkspace channel="pos" branchName={branchName} cashierName={cashierName} activeShift={shift} />
+    <SalesWorkspace channel="pos" branchName={branchName} cashierName={cashierName} activeShift={shift} mobileFooterBleed="cashier" />
   </div>
 }

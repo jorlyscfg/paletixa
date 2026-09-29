@@ -1,9 +1,10 @@
-import { type FormEvent, type KeyboardEvent, useEffect, useRef, useState } from 'react'
+import { type FormEvent, type KeyboardEvent, useContext, useEffect, useRef, useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { NavigationDrawerOpenContext } from '../../../app/navigationDrawerContext'
+import { CatalogControlsHeader, CatalogMobileSummary, CatalogPricePair, CatalogSelectionCard } from '../../../app/components/CatalogPresentation'
 import { CatalogImageTile } from '../../../app/components/CatalogImageTile'
 import { CustomSelect } from '../../../app/components/CustomSelect'
 import { InfoButton } from '../../../app/components/InfoButton'
-import { MobileBottomActionBar } from '../../../app/components/MobileBottomActionBar'
 import { Modal } from '../../../app/components/Modal'
 import { ResponsiveActionButton } from '../../../app/components/ResponsiveActionButton'
 import { SearchInput } from '../../../app/components/SearchInput'
@@ -162,12 +163,13 @@ function wholesalePriceClass(value: number | null | undefined, availableClass = 
 function PosPricePair({ retailPriceMxn, wholesalePriceMxn, appliedLabel }: { retailPriceMxn: number; wholesalePriceMxn: number | null; appliedLabel?: string }) {
   const retailIsActive = appliedLabel === 'Precio de menudeo'
   const wholesaleIsActive = appliedLabel === 'Precio de mayoreo'
-  return <>
-    <div data-testid="pos-price-pair" data-active-price={appliedLabel} className="mt-2 grid grid-cols-2 gap-2 border-t border-slate-800 pt-2">
-      <div className={retailIsActive ? 'rounded-lg border border-sky-400/40 bg-sky-500/10 p-2' : 'p-2'}><p className="text-[10px] font-bold uppercase tracking-wider text-sky-200">Menudeo</p><p className="mt-1 text-xs font-black text-white">{formatCatalogPrice(retailPriceMxn)}</p></div>
-      <div className={wholesaleIsActive ? 'rounded-lg border border-amber-400/50 bg-amber-500/10 p-2' : 'p-2'}><p className="text-[10px] font-bold uppercase tracking-wider text-amber-400">Mayorista</p><p className={`mt-1 text-xs font-black ${wholesalePriceClass(wholesalePriceMxn)}`}>{formatWholesaleCatalogPrice(wholesalePriceMxn)}</p></div>
-    </div>
-  </>
+  return <CatalogPricePair
+    dataTestId="pos-price-pair"
+    dataActivePrice={appliedLabel}
+    active={retailIsActive ? 'retail' : wholesaleIsActive ? 'wholesale' : undefined}
+    retailValue={formatCatalogPrice(retailPriceMxn)}
+    wholesaleValue={<span className={wholesalePriceClass(wholesalePriceMxn)}>{formatWholesaleCatalogPrice(wholesalePriceMxn)}</span>}
+  />
 }
 
 function priceFor(product: Product, channel: SalesChannel, categoryQuantity = 0, wholesaleThreshold?: number) {
@@ -500,7 +502,7 @@ function SaleDetailsSection({
   </section>
 }
 
-type SalesWorkspaceProps = { channel: SalesChannel; branchName?: string; cashierName?: string | null; activeShift?: PosShift; ticketImageUrl?: string | null; initialViewMode?: 'products' | 'categories' }
+type SalesWorkspaceProps = { channel: SalesChannel; branchName?: string; cashierName?: string | null; activeShift?: PosShift; ticketImageUrl?: string | null; initialViewMode?: 'products' | 'categories'; mobileFooterBleed?: 'admin' | 'cashier' }
 
 export function SalesWorkspace(props: SalesWorkspaceProps) {
   if (props.channel === 'event') {
@@ -509,8 +511,9 @@ export function SalesWorkspace(props: SalesWorkspaceProps) {
   return <SalesWorkspaceContent {...props} />
 }
 
-function SalesWorkspaceContent({ channel, branchName, cashierName, activeShift, ticketImageUrl, initialViewMode = 'categories' }: SalesWorkspaceProps) {
+function SalesWorkspaceContent({ channel, branchName, cashierName, activeShift, ticketImageUrl, initialViewMode = 'categories', mobileFooterBleed = 'admin' }: SalesWorkspaceProps) {
   const persistence = useAdminSessionPersistence()
+  const navigationDrawerOpen = useContext(NavigationDrawerOpenContext)?.isOpen ?? false
   const sessionModule = `sales:${channel}`
   const [restoredSession] = useState<SalesSessionState>(() => persistence?.read(sessionModule, isSalesSessionState) ?? {
     searchQuery: '',
@@ -771,14 +774,16 @@ function SalesWorkspaceContent({ channel, branchName, cashierName, activeShift, 
   const isPosMobileReview = channel === 'pos' && mobileCheckoutStep === 'review'
   const isPosMobileCatalog = channel === 'pos' && mobileCheckoutStep === 'catalog'
 
-  return <section data-testid={channel === 'pos' ? 'pos-workspace' : undefined} aria-label={channel === 'pos' ? 'Punto de venta' : presentation.title} className={`ops-workspace-frame flex min-h-0 min-w-0 w-full flex-1 flex-col overflow-hidden rounded-[1.75rem] border border-slate-800 bg-slate-900 p-3 text-slate-100 shadow-xl sm:p-5 lg:p-6 ${channel === 'pos' ? 'lg:h-full lg:flex lg:flex-col lg:overflow-hidden' : ''} ${isPosMobileReview ? 'h-[calc(100dvh-4rem-1.5rem)] min-h-0 flex-col overflow-hidden pb-[calc(1rem+env(safe-area-inset-bottom))] sm:h-[calc(100dvh-4rem-2rem)] sm:pb-[calc(1.25rem+env(safe-area-inset-bottom))] lg:pb-6' : ''}`}>
+  const mobileFooterBleedClass = mobileFooterBleed === 'cashier' ? '-mb-3 sm:-mb-4 lg:mb-0' : '-mb-4 sm:-mb-6 lg:mb-0'
+
+  return <section data-testid={channel === 'pos' ? 'pos-workspace' : undefined} aria-label={channel === 'pos' ? 'Punto de venta' : presentation.title} className={`ops-workspace-frame flex min-h-0 min-w-0 w-full flex-1 flex-col overflow-hidden rounded-[1.75rem] border border-slate-800 bg-slate-900 p-3 text-slate-100 shadow-xl sm:p-5 lg:p-6 ${channel === 'pos' ? 'lg:h-full lg:flex lg:flex-col lg:overflow-hidden' : ''} ${isPosMobileCatalog ? mobileFooterBleedClass : ''} ${isPosMobileReview ? 'pb-[calc(1rem+env(safe-area-inset-bottom))] sm:pb-[calc(1.25rem+env(safe-area-inset-bottom))] lg:pb-6' : ''}`}>
     {channel !== 'pos' && <div className="ops-module-header shrink-0 border-b border-slate-800 pb-4">
         <p className={`text-xs font-bold uppercase tracking-[0.16em] ${presentation.accentClass}`}>{branchName ? `Sucursal ${branchName}` : presentation.eyebrow}</p>
         <p className="mt-2 max-w-2xl text-sm leading-relaxed text-slate-400">{presentation.description}</p>
     </div>}
 
-    <form ref={salesFormRef} noValidate onSubmit={reviewSale} data-testid={channel === 'pos' ? 'pos-sales-form' : undefined} className={`${channel === 'pos' ? (isPosMobileReview ? 'mt-0' : 'mt-2') : 'mt-7'} ${isPosMobileReview ? 'flex min-h-0 flex-1 flex-col overflow-hidden gap-2 lg:grid' : 'grid min-h-0 flex-1 grid-rows-[minmax(0,1fr)_auto] gap-4 overflow-hidden lg:grid-rows-[minmax(0,1fr)]'} min-w-0 lg:gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(19rem,24rem)] ${isPosMobileCatalog ? 'pb-32 lg:pb-0' : ''} ${channel === 'pos' ? 'lg:min-h-0 lg:flex-1 lg:overflow-hidden' : ''}`}>
-      <div data-testid={channel === 'pos' ? 'pos-catalog-column' : undefined} className={`min-w-0 flex min-h-0 flex-col overflow-hidden ${channel === 'pos' ? 'lg:flex lg:min-h-0 lg:flex-col lg:overflow-hidden' : 'lg:block'} ${isPosMobileReview ? 'hidden' : ''}`}>
+    <form ref={salesFormRef} noValidate onSubmit={reviewSale} data-testid={channel === 'pos' ? 'pos-sales-form' : undefined} className={`${channel === 'pos' ? (isPosMobileReview ? 'mt-0' : 'mt-2') : 'mt-7'} ${isPosMobileReview ? 'flex min-h-0 flex-1 flex-col overflow-hidden gap-2 lg:grid' : 'grid min-h-0 flex-1 grid-rows-[minmax(0,1fr)_auto] gap-4 overflow-hidden lg:grid-rows-[minmax(0,1fr)]'} min-w-0 lg:gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(19rem,24rem)] ${channel === 'pos' ? 'lg:min-h-0 lg:flex-1 lg:overflow-hidden' : ''}`}>
+      <div data-testid={channel === 'pos' ? 'pos-catalog-column' : undefined} className={`min-w-0 flex min-h-0 flex-col overflow-hidden ${channel === 'pos' ? 'lg:flex' : 'lg:block'} ${isPosMobileReview ? 'hidden' : ''}`}>
         {channel !== 'pos' && <section aria-labelledby="product-list-title" className="border-b border-slate-800 pb-4">
           <div className="flex flex-wrap items-end justify-between gap-3">
             <div className="flex items-center gap-1">
@@ -801,55 +806,28 @@ function SalesWorkspaceContent({ channel, branchName, cashierName, activeShift, 
           <ResponsiveActionButton type="button" label="Reintentar" icon="refresh" onClick={() => void refetch()} className="mt-4" />
         </div>}
 
-         {loadState === 'ready' && products.length === 0 && <div data-testid={channel === 'pos' ? 'pos-catalog-scroll' : undefined} className={`mt-4 ${channel === 'pos' ? 'min-h-0 lg:flex-1 lg:overflow-y-auto lg:overscroll-contain' : ''}`}><p className="ops-state ops-state-empty rounded-2xl border border-dashed border-slate-700 bg-slate-900/50 p-6 text-sm text-slate-300">No hay productos activos en el catálogo. Agrega un producto activo antes de registrar una venta.</p></div>}
+         {loadState === 'ready' && products.length === 0 && <div data-testid={channel === 'pos' ? 'pos-catalog-scroll' : undefined} className={`mt-4 ${channel === 'pos' ? 'ops-scroll-region min-h-0 flex-1 overflow-y-auto overscroll-contain' : ''}`}><p className="ops-state ops-state-empty rounded-2xl border border-dashed border-slate-700 bg-slate-900/50 p-6 text-sm text-slate-300">No hay productos activos en el catálogo. Agrega un producto activo antes de registrar una venta.</p></div>}
 
-        {loadState === 'ready' && products.length > 0 && <div id="sale-products" role="tabpanel" aria-labelledby={channel === 'pos' ? undefined : 'product-list-title'} aria-label={channel === 'pos' ? 'Productos disponibles' : undefined} className={channel === 'pos' ? 'mt-2 lg:flex lg:min-h-0 lg:flex-1 lg:flex-col' : 'mt-4 flex min-h-0 flex-1 flex-col'}>
-          <div className="flex flex-col gap-3">
-             <div className="flex min-w-0 items-stretch gap-2">
-               <SearchInput
-                 label="Buscar productos"
-                 value={searchQuery}
-                 onChange={setSearchQuery}
-                 placeholder="Busca por producto, SKU, categoría o etiqueta"
-                 containerClassName="min-w-0 flex-1"
-                 className=""
-               />
-               {channel === 'pos' && <div role="tablist" aria-label="Vista de catálogo" className="flex shrink-0 items-center gap-1">
-                  <ResponsiveActionButton type="button" role="tab" aria-selected={viewMode === 'products'} aria-controls="sale-products" label="Vista por producto" icon="catalog" iconOnly className="ops-tab" onClick={() => setViewMode('products')} />
-                  <ResponsiveActionButton type="button" role="tab" aria-selected={viewMode === 'categories'} aria-controls="sale-products" label="Vista por categoría" icon="package" iconOnly className="ops-tab" onClick={() => setViewMode('categories')} />
-               </div>}
-               <ResponsiveActionButton
-                 type="button"
-                 label="Actualizar productos"
-                 icon="refresh"
-                 disabled={isSubmitting}
-                  onClick={() => void refetch()}
-                 className="shrink-0"
-               />
-             </div>
-             {(channel !== 'pos' || viewMode === 'products') && <div role="tablist" aria-label="Categorías de productos" className="ops-horizontal-scroll flex min-w-0 gap-2 overflow-x-auto pb-1">
-              {categories.map((category) => <ResponsiveActionButton
-                key={category}
-                type="button"
-                role="tab"
-                 aria-selected={selectedCategory === category}
-                 aria-controls="sale-products"
-                 label={category}
-                 onClick={() => setSelectedCategory(category)}
-                 className="ops-tab shrink-0 px-4 text-xs"
-              >{category}</ResponsiveActionButton>)}
+        {loadState === 'ready' && products.length > 0 && <div id="sale-products" role="tabpanel" aria-labelledby={channel === 'pos' ? undefined : 'product-list-title'} aria-label={channel === 'pos' ? 'Productos disponibles' : undefined} className={channel === 'pos' ? 'mt-2 flex min-h-0 flex-1 flex-col' : 'mt-4 flex min-h-0 flex-1 flex-col'}>
+          <CatalogControlsHeader
+            toolbar={<>
+              <SearchInput label="Buscar productos" value={searchQuery} onChange={setSearchQuery} placeholder="Busca por producto, SKU, categoría o etiqueta" containerClassName="min-w-0 flex-1" />
+              {channel === 'pos' && <div role="tablist" aria-label="Vista de catálogo" className="flex shrink-0 items-center gap-1">
+                <ResponsiveActionButton type="button" role="tab" aria-selected={viewMode === 'products'} aria-controls="sale-products" label="Vista por producto" icon="catalog" iconOnly className="ops-tab" onClick={() => setViewMode('products')} />
+                <ResponsiveActionButton type="button" role="tab" aria-selected={viewMode === 'categories'} aria-controls="sale-products" label="Vista por categoría" icon="package" iconOnly className="ops-tab" onClick={() => setViewMode('categories')} />
+              </div>}
+              <ResponsiveActionButton type="button" label="Actualizar productos" icon="refresh" disabled={isSubmitting} onClick={() => void refetch()} className="shrink-0" />
+            </>}
+            categoryFilters={(channel !== 'pos' || viewMode === 'products') && <div role="tablist" aria-label="Categorías de productos" className="ops-horizontal-scroll flex min-w-0 gap-2 overflow-x-auto pb-1">
+              {categories.map((category) => <ResponsiveActionButton key={category} type="button" role="tab" aria-selected={selectedCategory === category} aria-controls="sale-products" label={category} onClick={() => setSelectedCategory(category)} className="ops-tab shrink-0 px-4 text-xs">{category}</ResponsiveActionButton>)}
             </div>}
-          </div>
+            titleId={`${channel}-catalog-title`}
+            title="Catálogo de productos"
+            info={<InfoButton id={`${channel}-catalog-info`} label="Explicar cómo agregar productos" open={catalogInfoOpen} onToggle={() => setCatalogInfoOpen((current) => !current)}>Toca una tarjeta para armar la venta. Ajusta las cantidades en el carrito.</InfoButton>}
+            count={`${filteredProducts.length} mostrados`}
+          />
 
-          <div className="mt-4 flex items-center justify-between gap-3">
-            <div className="flex items-center gap-1">
-              <h2 className="text-sm font-bold uppercase tracking-[0.12em] text-slate-300">Catálogo de productos</h2>
-              <InfoButton id={`${channel}-catalog-info`} label="Explicar cómo agregar productos" open={catalogInfoOpen} onToggle={() => setCatalogInfoOpen((current) => !current)}>Toca una tarjeta para armar la venta. Ajusta las cantidades en el carrito.</InfoButton>
-            </div>
-            <span className="shrink-0 text-xs font-semibold text-slate-500">{filteredProducts.length} mostrados</span>
-          </div>
-
-          <div data-testid={channel === 'pos' ? 'pos-catalog-scroll' : 'sales-catalog-scroll'} className="ops-scroll-region min-h-0 flex-1 overflow-y-auto overscroll-contain lg:flex-1 lg:overflow-y-auto lg:overscroll-contain">
+          <div data-testid={channel === 'pos' ? 'pos-catalog-scroll' : 'sales-catalog-scroll'} className="ops-scroll-region min-h-0 flex-1 overflow-y-auto overscroll-contain">
           {channel === 'pos' && viewMode === 'categories' ? <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-4">
             {catalogCategories.map((category) => {
               const categoryQuantity = categoryQuantityById.get(category.id) ?? 0
@@ -861,28 +839,21 @@ function SalesWorkspaceContent({ channel, branchName, cashierName, activeShift, 
               const cardLabel = unavailable
                 ? wholesalePrice === null && isPosWholesaleQuantity(categoryQuantity, wholesaleThreshold) ? `Categoría ${category.name} sin precio mayorista` : `Categoría ${category.name} sin precio uniforme`
                 : `Agregar categoría ${category.name} a la venta`
-              return <article
+              return <CatalogSelectionCard
                 key={category.id}
-                data-testid="sales-category-card"
-                role="button"
-                tabIndex={cardDisabled ? -1 : 0}
-                aria-disabled={cardDisabled}
-                aria-label={cardLabel}
-                title={cardLabel}
-                onClick={() => { if (!cardDisabled) addCategory(category.id) }}
-                onKeyDown={(event) => activateCatalogCard(event, () => addCategory(category.id), cardDisabled)}
-                className="group flex min-w-0 cursor-pointer flex-col rounded-2xl border border-slate-800 bg-slate-900/65 p-2.5 text-left transition-colors hover:border-slate-700 hover:bg-slate-900 focus:outline-none aria-disabled:cursor-not-allowed aria-disabled:opacity-60 ops-focus"
-              >
-                <CatalogImageTile
-                   src={category.products.find((product) => product.imageUrl)?.imageUrl ?? null}
-                  alt={`Categoría ${category.name}`}
-                  fallback={<div className="flex h-full w-full flex-col items-center justify-center gap-2 text-slate-500"><Icon name="package" className="h-8 w-8" /><span className="text-[10px] font-bold uppercase tracking-wider">Imagen pendiente</span></div>}
-                  className="aspect-square w-full border-slate-800 bg-slate-950"
-                >
-                  {categoryQuantity > 0 && <span className={`absolute right-2 top-2 rounded-full border px-2 py-1 text-[10px] font-black text-white ${presentation.quantityBadgeClass}`}>{categoryQuantity} en el carrito</span>}
-                </CatalogImageTile>
-                    <div className="mt-2 min-w-0"><h3 className="truncate text-sm font-bold text-white" title={category.name}>{category.name}</h3><p className="mt-1 text-[11px] font-semibold uppercase tracking-wide text-slate-500">{category.products.length} productos activos</p>{retailPrice === null ? <p className="mt-2 text-xs font-semibold text-amber-200">Precio requiere revisión</p> : <PosPricePair retailPriceMxn={retailPrice} wholesalePriceMxn={wholesalePrice} appliedLabel={categoryQuantity > 0 ? getPosCategoryPriceLabel(products, category.id, categoryQuantity, wholesaleThreshold) : undefined} />}</div>
-               </article>
+                dataTestId="sales-category-card"
+                label={cardLabel}
+                disabled={cardDisabled}
+                imageSrc={category.products.find((product) => product.imageUrl)?.imageUrl ?? null}
+                imageAlt={`Categoría ${category.name}`}
+                imageFallback={<div className="flex h-full w-full flex-col items-center justify-center gap-2 text-slate-500"><Icon name="package" className="h-8 w-8" /><span className="text-[10px] font-bold uppercase tracking-wider">Imagen pendiente</span></div>}
+                badge={categoryQuantity > 0 && <span className={`absolute right-2 top-2 rounded-full border px-2 py-1 text-[10px] font-black text-white ${presentation.quantityBadgeClass}`}>{categoryQuantity} en el carrito</span>}
+                title={category.name}
+                metadata={`${category.products.length} productos activos`}
+                pricePair={retailPrice === null ? null : <PosPricePair retailPriceMxn={retailPrice} wholesalePriceMxn={wholesalePrice} appliedLabel={categoryQuantity > 0 ? getPosCategoryPriceLabel(products, category.id, categoryQuantity, wholesaleThreshold) : undefined} />}
+                notice={retailPrice === null ? 'Precio requiere revisión' : undefined}
+                onSelect={() => addCategory(category.id)}
+              />
             })}
            </div> : filteredProducts.length === 0 ? <div className="ops-state ops-state-filtered-empty mt-4 rounded-2xl border border-dashed border-slate-700 bg-slate-900/40 p-8 text-center">
             <p className="text-sm font-semibold text-slate-300">No hay productos que coincidan con estos filtros.</p>
@@ -893,7 +864,20 @@ function SalesWorkspaceContent({ channel, branchName, cashierName, activeShift, 
               const price = priceFor(product, channel, categoryQuantityById.get(product.categoryId) ?? 0, wholesaleThreshold)
               const cardDisabled = isSubmitting || isComplete
               const cardLabel = `${quantity > 0 ? 'Agregar otra unidad de' : 'Agregar'} ${product.name} a la venta`
-              return <article
+              return channel === 'pos' ? <CatalogSelectionCard
+                key={product.id}
+                dataTestId="sales-product-card"
+                label={cardLabel}
+                disabled={cardDisabled}
+                imageSrc={product.imageUrl}
+                imageAlt={product.name}
+                imageClassName="transition-transform duration-200 group-hover:scale-105"
+                badge={quantity > 0 && <span className={`absolute right-2 top-2 rounded-full border px-2 py-1 text-[10px] font-black text-white ${presentation.quantityBadgeClass}`}>{quantity} en el carrito</span>}
+                title={product.name}
+                metadata={product.category}
+                pricePair={<PosPricePair retailPriceMxn={product.retailPriceMxn} wholesalePriceMxn={product.wholesalePriceMxn} appliedLabel={quantity > 0 ? priceLabelFor(channel, categoryQuantityById.get(product.categoryId) ?? 0, product.wholesalePriceMxn, wholesaleThreshold) : undefined} />}
+                onSelect={() => addProduct(product.id)}
+              /> : <article
                 key={product.id}
                 data-testid="sales-product-card"
                 role="button"
@@ -905,20 +889,15 @@ function SalesWorkspaceContent({ channel, branchName, cashierName, activeShift, 
                 onKeyDown={(event) => activateCatalogCard(event, () => addProduct(product.id), cardDisabled)}
                 className="group flex min-w-0 cursor-pointer flex-col rounded-2xl border border-slate-800 bg-slate-900/65 p-2.5 text-left transition-colors hover:border-slate-700 hover:bg-slate-900 focus:outline-none aria-disabled:cursor-not-allowed aria-disabled:opacity-60 ops-focus"
               >
-                <CatalogImageTile
-                  src={product.imageUrl}
-                  alt={product.name}
-                  imageClassName="transition-transform duration-200 group-hover:scale-105"
-                  className="aspect-square w-full border-slate-800 bg-slate-950"
-                >
+                <CatalogImageTile src={product.imageUrl} alt={product.name} imageClassName="transition-transform duration-200 group-hover:scale-105" className="aspect-square w-full border-slate-800 bg-slate-950">
                   {quantity > 0 && <span className={`absolute right-2 top-2 rounded-full border px-2 py-1 text-[10px] font-black text-white ${presentation.quantityBadgeClass}`}>{quantity} en el carrito</span>}
                 </CatalogImageTile>
                 <div className="mt-2 min-w-0">
                   <h3 className="truncate text-sm font-bold text-white" title={product.name}>{product.name}</h3>
-                   <p className="mt-1 truncate text-[11px] font-semibold uppercase tracking-wide text-slate-500">{product.category}</p>
-                      {channel === 'pos' ? <PosPricePair retailPriceMxn={product.retailPriceMxn} wholesalePriceMxn={product.wholesalePriceMxn} appliedLabel={quantity > 0 ? priceLabelFor(channel, categoryQuantityById.get(product.categoryId) ?? 0, product.wholesalePriceMxn, wholesaleThreshold) : undefined} /> : <p className="mt-2 text-xs font-semibold text-slate-300">{priceLabelFor(channel, categoryQuantityById.get(product.categoryId) ?? 0)} <span className={`font-black ${channel === 'wholesale' ? wholesalePriceClass(price, 'text-white') : 'text-white'}`}>{channel === 'wholesale' ? formatWholesaleCatalogPrice(price) : formatCatalogPrice(price)}</span></p>}
+                  <p className="mt-1 truncate text-[11px] font-semibold uppercase tracking-wide text-slate-500">{product.category}</p>
+                  <p className="mt-2 text-xs font-semibold text-slate-300">{priceLabelFor(channel, categoryQuantityById.get(product.categoryId) ?? 0)} <span className={`font-black ${channel === 'wholesale' ? wholesalePriceClass(price, 'text-white') : 'text-white'}`}>{channel === 'wholesale' ? formatWholesaleCatalogPrice(price) : formatCatalogPrice(price)}</span></p>
                 </div>
-               </article>
+              </article>
             })}
           </div>}
           </div>
@@ -1012,10 +991,7 @@ function SalesWorkspaceContent({ channel, branchName, cashierName, activeShift, 
 
            </aside>
     </form>
-     {isPosMobileCatalog && <MobileBottomActionBar dataTestId="pos-mobile-summary-bar">
-         <div className="flex items-center justify-between gap-3"><div className="min-w-0"><p className="text-xs font-bold uppercase tracking-[0.12em] text-slate-400">{itemCount} {itemCount === 1 ? 'artículo' : 'artículos'}</p><p className="mt-1 truncate text-lg font-black text-white">{hasUnavailableWholesaleSalePrice ? NO_WHOLESALE_PRICE : formatMxn(displayEstimate)}</p></div></div>
-         <ResponsiveActionButton type="button" label="Revisar venta" icon="chevron-right" showLabel disabled={saleItems.length === 0} onClick={() => setMobileCheckoutStep('review')} className="w-full bg-sky-600 text-white hover:bg-sky-500" />
-     </MobileBottomActionBar>}
+     {isPosMobileCatalog && <CatalogMobileSummary dataTestId="pos-mobile-summary-bar" ariaHidden={navigationDrawerOpen} inert={navigationDrawerOpen} count={itemCount} singularLabel="artículo" pluralLabel="artículos" total={hasUnavailableWholesaleSalePrice ? NO_WHOLESALE_PRICE : formatMxn(displayEstimate)} actionLabel="Revisar venta" disabled={saleItems.length === 0} onAction={() => setMobileCheckoutStep('review')} detailsTestId="pos-mobile-summary-details" />}
     {confirmationModalOpen && <Modal
       title="Confirmar registro de venta"
       description="Verifica la venta antes de registrarla."

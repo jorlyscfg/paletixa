@@ -1,7 +1,7 @@
 import { type ChangeEvent, type FormEvent, type ReactNode, useEffect, useMemo, useRef, useState } from 'react'
 import { CatalogImageTile } from '../../../app/components/CatalogImageTile'
 import { InfoButton } from '../../../app/components/InfoButton'
-import { MobileBottomActionBar } from '../../../app/components/MobileBottomActionBar'
+import { CatalogMobileSummary } from '../../../app/components/CatalogPresentation'
 import { Modal } from '../../../app/components/Modal'
 import { ResponsiveActionButton } from '../../../app/components/ResponsiveActionButton'
 import { SearchInput } from '../../../app/components/SearchInput'
@@ -520,13 +520,13 @@ function EventReservationComposer({ catalog, onCreated }: { catalog: WholesaleCa
   const total = getWholesaleDraftTotal(draft, catalog)
   const review = mobileStep === 'review'
 
-  return <section aria-label="Crear reserva de evento" className={`ops-workspace-frame flex min-h-0 min-w-0 flex-1 flex-col gap-4 overflow-hidden rounded-3xl border border-slate-800 bg-slate-900 p-3 text-slate-100 shadow-xl sm:p-5 lg:h-full lg:p-6 ${review ? '' : 'pb-32'} lg:pb-6`}>
+  return <section aria-label="Crear reserva de evento" className={`flex min-h-0 min-w-0 flex-1 flex-col gap-4 ${review ? 'overflow-hidden' : 'overflow-visible'} text-slate-100 lg:h-full lg:overflow-hidden`}>
     {error && <p role="alert" className="ops-state ops-state-error shrink-0 rounded-xl border border-rose-500/30 bg-rose-950/30 px-3 py-2 text-sm text-rose-100">{error}</p>}
     <div className={`${review ? 'grid' : 'flex flex-col'} min-h-0 min-w-0 flex-1 items-stretch gap-4 overflow-hidden lg:grid lg:min-h-0 lg:flex-1 lg:items-stretch lg:grid-cols-[minmax(0,1fr)_minmax(19rem,24rem)] lg:grid-rows-[minmax(0,1fr)] lg:gap-5`}>
-      <div className={`${mobileStep === 'catalog' ? 'flex min-h-0 flex-1 flex-col overflow-hidden' : 'hidden'} ops-panel-frame min-w-0 rounded-2xl border border-slate-800 bg-slate-950 p-3 shadow-xl sm:p-4 lg:flex lg:min-h-0 lg:flex-col lg:overflow-hidden`}><DraftCatalog draft={draft} catalog={catalog} formatMoney={formatEventMoney} showPortalTabs={false} onChange={(items) => setDraft((current) => ({ ...current, items }))} /></div>
+      <div data-testid="event-admin-catalog-panel" className={`${mobileStep === 'catalog' ? 'flex min-h-0 flex-1 flex-col overflow-hidden' : 'hidden'} min-w-0 lg:flex lg:min-h-0 lg:flex-col lg:overflow-hidden`}><DraftCatalog draft={draft} catalog={catalog} formatMoney={formatEventMoney} showPortalTabs={false} presentationVariant="admin" onChange={(items) => setDraft((current) => ({ ...current, items }))} /></div>
       <form noValidate onSubmit={submit} className={`${mobileStep === 'review' ? '' : 'hidden'} min-w-0 lg:flex lg:min-h-0 lg:flex-1 lg:flex-col lg:overflow-hidden ${review ? 'flex min-h-0 flex-1 flex-col gap-2 overflow-hidden' : ''}`}><div className="mb-0 flex shrink-0 flex-wrap items-center justify-between gap-2 lg:hidden"><div><p className="text-xs font-bold uppercase tracking-[0.12em] text-sky-400">Paso 2 de 2</p><p className="mt-1 text-sm font-semibold text-slate-300">Revisa la reserva antes de crearla.</p></div><ResponsiveActionButton type="button" label="Volver al catálogo" icon="chevron-left" showLabel onClick={() => setMobileStep('catalog')} /></div><CustomerOrderSummary variant="event" formatMoney={formatEventMoney} showPaymentPanel={false} draft={draft} catalog={catalog} mobileReview={review} submitBusy={busy || ticketBusy} onChange={(items) => setDraft((current) => ({ ...current, items }))} onClear={clearDraft} onPaymentChange={async (paymentMethod) => changeForm('paymentMethod', paymentMethod)} beforeSubmit={<EventReservationDetails form={form} errors={errors} totalMxn={total} disabled={busy || ticketBusy} ticketBusy={ticketBusy} transferTicket={form.transferTicket} onTicketSelect={(event) => void selectTicket(event)} onTicketRemove={removeTicket} onPaymentMethodChange={(paymentMethod) => void changePaymentMethod(paymentMethod)} onChange={changeForm} showOrigin origin={origin} onOriginChange={setOrigin} />} submitLabel="Crear reserva pendiente" submitLoadingLabel="Creando reserva…" /></form>
     </div>
-    {mobileStep === 'catalog' && <MobileBottomActionBar><div className="flex items-center justify-between gap-3"><div><p className="text-xs font-bold uppercase tracking-[0.12em] text-slate-400">{itemCount} {itemCount === 1 ? 'artículo' : 'artículos'}</p><p className="mt-1 text-lg font-black text-white">{formatEventMoney(total)}</p></div></div><ResponsiveActionButton type="button" label="Revisar reserva" icon="chevron-right" showLabel disabled={itemCount === 0} onClick={() => setMobileStep('review')} className="w-full bg-sky-600 text-white hover:bg-sky-500" /></MobileBottomActionBar>}
+    {mobileStep === 'catalog' && <CatalogMobileSummary dataTestId="event-admin-mobile-summary" count={itemCount} singularLabel="artículo" pluralLabel="artículos" total={formatEventMoney(total)} actionLabel="Revisar reserva" disabled={itemCount === 0} onAction={() => setMobileStep('review')} detailsTestId="event-admin-mobile-summary-details" />}
   </section>
 }
 
