@@ -1,6 +1,7 @@
-import { useCallback, useEffect, useState, type ReactNode } from 'react'
+import { useCallback, useContext, useEffect, useState, type ReactNode } from 'react'
 import { AppProviders } from './app/AppProviders'
 import { AppShell, type AdminNotification } from './app/AppShell'
+import { NavigationDrawerOpenContext } from './app/navigationDrawerContext'
 import { APP_MODULES, type AppModule } from './app/appModules'
 import { ResponsiveActionButton } from './app/components/ResponsiveActionButton'
 import { isSessionRecord, isSessionString, useAdminSessionPersistence } from './app/sessionPersistence'
@@ -121,12 +122,20 @@ function AdminShell({ context, activeModule, onModuleChange, onLogout, onNotific
 }
 
 function AdminApp({ showLogin }: { showLogin: boolean }) {
+  const [navigationDrawerOpen, setNavigationDrawerOpen] = useState(false)
   const navigateToLogin = useCallback(() => {
+    setNavigationDrawerOpen(false)
     window.history.replaceState(null, '', ADMIN_LOGIN_PATH)
     window.dispatchEvent(new Event('popstate'))
   }, [])
 
-  return <AppProviders><a href="#main-content" className="sr-only z-10 rounded-md bg-slate-950 px-4 py-3 text-white focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:ring-offset-2">Saltar al contenido principal</a><AdminBoundary showLogin={showLogin} onSessionClosed={navigateToLogin} admin={(closeSession, context) => <AdminAppContentWithLogout context={context} closeSession={closeSession} />} cashier={(context, closeSession) => <CashierWorkspace context={context} closeSession={closeSession} />}>{null}</AdminBoundary></AppProviders>
+  return <AppProviders><NavigationDrawerOpenContext.Provider value={{ isOpen: navigationDrawerOpen, setIsOpen: setNavigationDrawerOpen }}><SkipToMainContentLink /><AdminBoundary showLogin={showLogin} onSessionClosed={navigateToLogin} admin={(closeSession, context) => <AdminAppContentWithLogout context={context} closeSession={closeSession} />} cashier={(context, closeSession) => <CashierWorkspace context={context} closeSession={closeSession} />}>{null}</AdminBoundary></NavigationDrawerOpenContext.Provider></AppProviders>
+}
+
+function SkipToMainContentLink() {
+  const navigationDrawerOpen = useContext(NavigationDrawerOpenContext)?.isOpen ?? false
+
+  return <a href="#main-content" aria-hidden={navigationDrawerOpen} inert={navigationDrawerOpen} className="sr-only z-10 rounded-md bg-slate-950 px-4 py-3 text-white focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:ring-offset-2">Saltar al contenido principal</a>
 }
 
 function AdminAppContentWithLogout({ context, closeSession }: { context: AccessContext; closeSession: () => Promise<void> }) {
@@ -165,9 +174,11 @@ function AdminAppContentWithLogout({ context, closeSession }: { context: AccessC
             ? <BranchWorkspace />
             : safeActiveModule === 'events'
               ? <EventReservationWorkspace focusReservationId={focusedReservationId} />
-              : safeActiveModule === 'configuration'
-                ? <ConfigurationWorkspace />
-                : <SalesWorkspace key={safeActiveModule} channel={safeActiveModule} />
+                : safeActiveModule === 'configuration'
+                  ? <ConfigurationWorkspace />
+                  : safeActiveModule === 'pos'
+                    ? <div data-testid="admin-pos-height-frame" className="grid min-h-0 min-w-0 flex-1 grid-rows-[minmax(0,1fr)]"><SalesWorkspace key="pos" channel="pos" /></div>
+                    : <SalesWorkspace key={safeActiveModule} channel={safeActiveModule} />
   return <AdminShell context={context} activeModule={safeActiveModule} onModuleChange={setActiveModule} onLogout={closeSession} onNotificationSelect={handleNotificationSelect}>{view}</AdminShell>
 }
 

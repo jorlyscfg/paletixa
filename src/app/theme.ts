@@ -9,6 +9,11 @@ export const THEME_OPTIONS = [
   { value: 'dark', label: 'Oscuro' },
 ] as const satisfies ReadonlyArray<{ value: Theme; label: string }>
 
+export function getNextTheme(theme: Theme): Theme {
+  const currentIndex = THEME_OPTIONS.findIndex((option) => option.value === theme)
+  return THEME_OPTIONS[(currentIndex + 1) % THEME_OPTIONS.length].value
+}
+
 type ThemeStorage = Pick<Storage, 'getItem' | 'setItem'>
 
 export type ThemeContextValue = {

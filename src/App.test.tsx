@@ -63,6 +63,11 @@ const adminContext: AccessContext = {
   branch: null,
 }
 
+async function openModuleNavigation() {
+  fireEvent.click(await screen.findByRole('button', { name: 'Abrir menú de navegación' }))
+  return screen.findByRole('dialog', { name: 'Navegación de módulos' })
+}
+
 describe('App module selection and cashier workspace', () => {
   afterEach(() => {
     cleanup()
@@ -110,6 +115,26 @@ describe('App module selection and cashier workspace', () => {
     expect(screen.queryByRole('form', { name: 'Inicio de sesión' })).not.toBeInTheDocument()
   })
 
+  it('isolates the global skip link while the admin navigation drawer is open', async () => {
+    render(<App />)
+
+    await screen.findByTestId('dashboard-view')
+    const skipLink = screen.getByRole('link', { name: 'Saltar al contenido principal' })
+    expect(skipLink).not.toHaveAttribute('inert')
+    expect(skipLink).not.toHaveAttribute('aria-hidden', 'true')
+
+    fireEvent.click(screen.getByRole('button', { name: 'Abrir menú de navegación' }))
+
+    const drawer = await screen.findByRole('dialog', { name: 'Navegación de módulos' })
+    expect(skipLink).toHaveAttribute('inert')
+    expect(skipLink).toHaveAttribute('aria-hidden', 'true')
+
+    fireEvent.keyDown(document, { key: 'Escape' })
+    await waitFor(() => expect(drawer).not.toBeInTheDocument())
+    expect(skipLink).not.toHaveAttribute('inert')
+    expect(skipLink).toHaveAttribute('aria-hidden', 'false')
+  })
+
   it('keeps unrecognized protected paths gated without exposing the login form there', async () => {
     window.history.replaceState(null, '', '/admin/catalog')
     vi.mocked(authApi.getAccessContext).mockResolvedValue(null)
@@ -136,19 +161,21 @@ describe('App module selection and cashier workspace', () => {
     render(<App />)
 
     expect(await screen.findByTestId('dashboard-view')).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Dashboard' })).toHaveAttribute('aria-current', 'page')
+    const drawer = await openModuleNavigation()
+    expect(within(drawer).getByRole('button', { name: 'Dashboard' })).toHaveAttribute('aria-current', 'page')
   })
 
   it('restores the last allowed administrative module after a fresh render', async () => {
     const first = render(<App />)
-    await screen.findByRole('navigation', { name: 'Navegación de módulos de escritorio' })
-    fireEvent.click(screen.getByRole('button', { name: 'Reportes' }))
+    const firstDrawer = await openModuleNavigation()
+    fireEvent.click(within(firstDrawer).getByRole('button', { name: 'Reportes' }))
     expect(screen.getByTestId('reports-view')).toBeInTheDocument()
     first.unmount()
 
     render(<App />)
     expect(await screen.findByTestId('reports-view')).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Reportes' })).toHaveAttribute('aria-current', 'page')
+    const restoredDrawer = await openModuleNavigation()
+    expect(within(restoredDrawer).getByRole('button', { name: 'Reportes' })).toHaveAttribute('aria-current', 'page')
   })
 
   it.each([
@@ -163,24 +190,38 @@ describe('App module selection and cashier workspace', () => {
     ['Configuración', 'configuration-view'],
   ])('renders the dedicated %s workspace', async (label, testId) => {
     render(<App />)
-    await screen.findByRole('navigation', { name: 'Navegación de módulos de escritorio' })
-    fireEvent.click(screen.getByRole('button', { name: new RegExp(`^${label}$`) }))
+    const drawer = await openModuleNavigation()
+    fireEvent.click(within(drawer).getByRole('button', { name: new RegExp(`^${label}$`) }))
     expect(screen.getByTestId(testId)).toBeInTheDocument()
+  })
+
+  it('bounds the admin POS workspace to the shell height remaining below its header', async () => {
+    render(<App />)
+    const drawer = await openModuleNavigation()
+    fireEvent.click(within(drawer).getByRole('button', { name: 'Punto de venta' }))
+
+    const shell = document.querySelector('.ops-shell')
+    const main = document.getElementById('main-content')
+    const heightFrame = screen.getByTestId('admin-pos-height-frame')
+    expect(shell).toHaveClass('h-dvh', 'min-h-0', 'flex-col', 'overflow-hidden')
+    expect(main).toHaveClass('min-h-0', 'flex-1', 'flex-col', 'overflow-hidden')
+    expect(heightFrame).toHaveClass('grid', 'min-h-0', 'min-w-0', 'flex-1', 'grid-rows-[minmax(0,1fr)]')
+    expect(heightFrame).toContainElement(screen.getByTestId('pos-view'))
   })
 
   it('hides report and configuration entries when their capabilities are absent', async () => {
     vi.mocked(authApi.getAccessContext).mockResolvedValue({ ...adminContext, capabilities: ['reports.view'] })
     render(<App />)
-    await screen.findByRole('navigation', { name: 'Navegación de módulos de escritorio' })
-    expect(screen.getByRole('button', { name: 'Reportes' })).toBeInTheDocument()
-    expect(screen.queryByRole('button', { name: 'Configuración' })).not.toBeInTheDocument()
+    let drawer = await openModuleNavigation()
+    expect(within(drawer).getByRole('button', { name: 'Reportes' })).toBeInTheDocument()
+    expect(within(drawer).queryByRole('button', { name: 'Configuración' })).not.toBeInTheDocument()
 
     vi.mocked(authApi.getAccessContext).mockResolvedValue({ ...adminContext, capabilities: [] })
     cleanup()
     render(<App />)
-    await screen.findByRole('navigation', { name: 'Navegación de módulos de escritorio' })
-    expect(screen.queryByRole('button', { name: 'Reportes' })).not.toBeInTheDocument()
-    expect(screen.queryByRole('button', { name: 'Configuración' })).not.toBeInTheDocument()
+    drawer = await openModuleNavigation()
+    expect(within(drawer).queryByRole('button', { name: 'Reportes' })).not.toBeInTheDocument()
+    expect(within(drawer).queryByRole('button', { name: 'Configuración' })).not.toBeInTheDocument()
   })
 
   it('refreshes unread wholesale notifications from realtime and focuses the selected order', async () => {
@@ -260,9 +301,9 @@ describe('App module selection and cashier workspace', () => {
     const heading = await screen.findByRole('heading', { name: 'Punto de venta' })
     expect(heading).toBeInTheDocument()
     const banner = screen.getByRole('banner')
-    expect(within(banner).getByRole('button', { name: 'Cambiar a modo claro' })).toBeInTheDocument()
+    expect(within(banner).getByRole('button', { name: 'Cambiar al tema claro' })).toBeInTheDocument()
     expect(banner.firstElementChild).toHaveClass('ops-navbar-header')
-    expect(within(banner).getByRole('button', { name: 'Cambiar a modo claro' })).toHaveClass('ops-navbar-action')
+    expect(within(banner).getByRole('button', { name: 'Cambiar al tema claro' })).toHaveClass('ops-navbar-action')
     expect(banner).toHaveClass('sticky', 'top-0', 'z-50', 'border-b', 'bg-slate-950/95', 'backdrop-blur')
     expect(banner.firstElementChild).toHaveClass('w-full', 'min-h-16')
     expect(banner.firstElementChild).not.toHaveClass('max-w-6xl')

@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen, within } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, within } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { WholesaleOrder } from '../features/wholesale/api/types'
 import { AppShell, type AppModule } from './AppShell'
@@ -6,31 +6,68 @@ import { AppShell, type AppModule } from './AppShell'
 describe('AppShell', () => {
   afterEach(cleanup)
 
-  it('marks the active module and changes modules without routing', () => {
+  it('marks the active module and changes modules from the navigation drawer', () => {
     const onModuleChange = vi.fn()
     render(<AppShell activeModule="catalog" onModuleChange={onModuleChange}><p>Contenido del catálogo</p></AppShell>)
-    const desktopNav = screen.getByRole('navigation', { name: 'Navegación de módulos de escritorio' })
-    expect(within(desktopNav).getByRole('button', { name: /Catálogo/ })).toHaveAttribute('aria-current', 'page')
+    fireEvent.click(screen.getByRole('button', { name: 'Abrir menú de navegación' }))
+    const nav = within(screen.getByRole('dialog', { name: 'Navegación de módulos' })).getByRole('navigation', { name: 'Navegación de módulos' })
+    expect(within(nav).getByRole('button', { name: /Catálogo/ })).toHaveAttribute('aria-current', 'page')
     const icons = { 'Dashboard': 'dashboard', 'Catálogo': 'catalog', 'Punto de venta': 'sale', 'Mayoristas': 'package', 'Eventos': 'calendar', 'Reportes': 'reports', 'Sucursales': 'branches' }
     for (const [label, icon] of Object.entries(icons)) {
-      const button = within(desktopNav).getByRole('button', { name: new RegExp(`^${label}`) })
+      const button = within(nav).getByRole('button', { name: new RegExp(`^${label}`) })
       expect(button.querySelector(`[data-icon="${icon}"]`)).not.toBeNull()
     }
-    expect(within(desktopNav).getByRole('button', { name: /Catálogo/ })).toHaveClass('ops-nav-button')
-    expect(desktopNav.firstElementChild).toHaveTextContent('Dashboard')
-    fireEvent.click(within(desktopNav).getByRole('button', { name: /^Punto de venta$/ }))
+    expect(within(nav).getByRole('button', { name: /Catálogo/ })).toHaveClass('ops-nav-button')
+    expect(nav.firstElementChild).toHaveTextContent('Dashboard')
+    fireEvent.click(within(nav).getByRole('button', { name: /^Punto de venta$/ }))
     expect(onModuleChange).toHaveBeenCalledWith('pos' satisfies AppModule)
     expect(screen.getByText('Contenido del catálogo')).toBeInTheDocument()
   })
 
-  it('activates a desktop module on the first pointer interaction', () => {
+  it('activates a module on the first pointer interaction inside the drawer', () => {
     const onModuleChange = vi.fn()
     render(<AppShell activeModule="catalog" onModuleChange={onModuleChange}><p>Contenido del catálogo</p></AppShell>)
+    fireEvent.click(screen.getByRole('button', { name: 'Abrir menú de navegación' }))
 
-    fireEvent.pointerUp(screen.getByRole('button', { name: /^Punto de venta$/ }), { button: 0, pointerType: 'mouse' })
+    fireEvent.pointerUp(within(screen.getByRole('dialog', { name: 'Navegación de módulos' })).getByRole('button', { name: /^Punto de venta$/ }), { button: 0, pointerType: 'mouse' })
 
     expect(onModuleChange).toHaveBeenCalledTimes(1)
     expect(onModuleChange).toHaveBeenCalledWith('pos')
+  })
+
+  it('sizes the admin shell and fixed action bars from the visible viewport', () => {
+    const originalInnerHeight = Object.getOwnPropertyDescriptor(window, 'innerHeight')
+    const originalVisualViewport = Object.getOwnPropertyDescriptor(window, 'visualViewport')
+    const viewport = new EventTarget() as unknown as VisualViewport
+    Object.defineProperties(viewport, {
+      height: { configurable: true, writable: true, value: 935 },
+      offsetTop: { configurable: true, writable: true, value: 25 },
+    })
+    Object.defineProperty(window, 'innerHeight', { configurable: true, value: 1024 })
+    Object.defineProperty(window, 'visualViewport', { configurable: true, value: viewport })
+
+    const { container, unmount } = render(<AppShell activeModule="pos" onModuleChange={() => {}}><p>Punto de venta</p></AppShell>)
+    const shell = container.querySelector<HTMLElement>('.ops-shell')
+
+    expect(shell).not.toBeNull()
+    expect(shell?.style.height).toBe('var(--ops-viewport-height, 100dvh)')
+    expect(shell?.style.getPropertyValue('--ops-viewport-height')).toBe('935px')
+    expect(shell?.style.getPropertyValue('--ops-viewport-top')).toBe('25px')
+    expect(shell?.style.getPropertyValue('--ops-viewport-bottom-inset')).toBe('64px')
+
+    Object.defineProperty(viewport, 'height', { configurable: true, writable: true, value: 700 })
+    Object.defineProperty(viewport, 'offsetTop', { configurable: true, writable: true, value: 40 })
+    act(() => viewport.dispatchEvent(new Event('resize')))
+
+    expect(shell?.style.getPropertyValue('--ops-viewport-height')).toBe('700px')
+    expect(shell?.style.getPropertyValue('--ops-viewport-top')).toBe('40px')
+    expect(shell?.style.getPropertyValue('--ops-viewport-bottom-inset')).toBe('284px')
+
+    unmount()
+    if (originalVisualViewport) Object.defineProperty(window, 'visualViewport', originalVisualViewport)
+    else Reflect.deleteProperty(window, 'visualViewport')
+    if (originalInnerHeight) Object.defineProperty(window, 'innerHeight', originalInnerHeight)
+    else Reflect.deleteProperty(window, 'innerHeight')
   })
 
   it('keeps the application header sticky with the shared backdrop treatment', () => {
@@ -39,7 +76,7 @@ describe('AppShell', () => {
     const header = screen.getByRole('banner')
     expect(header).toHaveClass('sticky', 'top-0', 'z-50', 'backdrop-blur')
     expect(within(header).getByText('Paletixa Operaciones')).toBeInTheDocument()
-    const themeToggle = within(header).getByRole('button', { name: 'Cambiar a modo claro' })
+    const themeToggle = within(header).getByRole('button', { name: 'Cambiar al tema claro' })
     expect(themeToggle).toHaveClass('ops-navbar-action')
     const activeLabel = within(header).getByText('Punto de venta', { exact: true })
     expect(activeLabel).toHaveClass('block', 'text-xs')
@@ -133,18 +170,20 @@ describe('AppShell', () => {
     expect(shell).toHaveClass('h-dvh', 'min-h-0', 'flex', 'flex-col', 'overflow-hidden')
     expect(main).toHaveClass('min-h-0', 'flex-1', 'overflow-hidden')
     expect(main.parentElement).toHaveClass('min-h-0', 'flex', 'flex-1', 'flex-col', 'overflow-hidden')
-    expect(screen.getByRole('complementary')).toHaveClass('min-h-0', 'shrink-0')
+    expect(screen.getByRole('button', { name: 'Abrir menú de navegación' })).toBeInTheDocument()
+    expect(screen.queryByRole('complementary')).not.toBeInTheDocument()
   })
 
   it('uses the neutral active state for wholesale operations', () => {
     const onModuleChange = vi.fn()
     render(<AppShell activeModule="wholesale" onModuleChange={onModuleChange}><p>Espacio mayorista</p></AppShell>)
-    const button = screen.getByRole('button', { name: /Mayoristas/ })
+    fireEvent.click(screen.getByRole('button', { name: 'Abrir menú de navegación' }))
+    const button = within(screen.getByRole('dialog', { name: 'Navegación de módulos' })).getByRole('button', { name: /Mayoristas/ })
     expect(button).toHaveClass('ops-nav-button')
     expect(button).toHaveAttribute('aria-current', 'page')
   })
 
-  it('opens a mobile menu, supports escape, and closes after selecting a module', () => {
+  it('opens the navigation drawer, supports escape, and closes after selecting a module', () => {
     const onModuleChange = vi.fn()
     render(<AppShell activeModule="catalog" onModuleChange={onModuleChange}><p>Espacio de trabajo</p></AppShell>)
     const menuButton = screen.getByRole('button', { name: 'Abrir menú de navegación' })
@@ -160,7 +199,93 @@ describe('AppShell', () => {
     expect(screen.queryByRole('dialog', { name: 'Navegación de módulos' })).not.toBeInTheDocument()
   })
 
-  it('activates and closes the mobile menu on the first pointer interaction', () => {
+  it('uses the hamburger and over-content drawer at every viewport size', () => {
+    const onModuleChange = vi.fn()
+    render(<AppShell activeModule="catalog" onModuleChange={onModuleChange}><p>Espacio de trabajo</p></AppShell>)
+
+    const menuButton = screen.getByRole('button', { name: 'Abrir menú de navegación' })
+    const header = screen.getByRole('banner')
+    expect(menuButton).toHaveClass('ops-navbar-action')
+    expect(menuButton).not.toHaveClass('hidden', 'md:hidden', 'lg:hidden', 'xl:hidden')
+    expect(header).toHaveClass('z-50')
+    expect(menuButton.closest('header')).toBe(header)
+    expect(screen.queryByRole('complementary')).not.toBeInTheDocument()
+
+    fireEvent.click(menuButton)
+    const drawer = screen.getByRole('dialog', { name: 'Navegación de módulos' })
+    expect(drawer).toHaveClass('fixed', 'inset-x-0', 'top-16', 'bottom-0', 'z-40')
+    // JSDOM does not model painted stacking; these classes preserve the intended
+    // contract that the header trigger sits above the drawer layer.
+    expect(drawer).not.toHaveClass('hidden', 'md:hidden', 'lg:hidden', 'xl:hidden')
+    const sidebar = within(drawer).getByRole('complementary')
+    expect(sidebar).toHaveClass('absolute', 'inset-y-0', 'left-0', 'flex')
+    expect(within(sidebar).getByRole('navigation', { name: 'Navegación de módulos' })).toBeInTheDocument()
+
+    // The same visible hamburger can close the drawer; JSDOM verifies the
+    // interaction handler, while the z-index assertions above cover its CSS contract.
+    fireEvent.click(menuButton)
+    expect(screen.queryByRole('dialog', { name: 'Navegación de módulos' })).not.toBeInTheDocument()
+
+    fireEvent.click(menuButton)
+    const reopenedDrawer = screen.getByRole('dialog', { name: 'Navegación de módulos' })
+    fireEvent.click(within(reopenedDrawer).getByRole('button', { name: 'Cerrar menú de navegación' }))
+    expect(screen.queryByRole('dialog', { name: 'Navegación de módulos' })).not.toBeInTheDocument()
+
+    fireEvent.click(menuButton)
+    fireEvent.click(within(screen.getByRole('dialog', { name: 'Navegación de módulos' })).getByRole('button', { name: 'Cerrar navegación de módulos' }))
+    expect(screen.queryByRole('dialog', { name: 'Navegación de módulos' })).not.toBeInTheDocument()
+  })
+
+  it('keeps only the hamburger and drawer controls available while navigation is open', () => {
+    render(<AppShell activeModule="catalog" onModuleChange={vi.fn()} notifications={[]} onLogout={vi.fn()}><p>Espacio de trabajo</p></AppShell>)
+    const header = screen.getByRole('banner')
+    const notificationButton = screen.getByRole('button', { name: 'Notificaciones: no hay pedidos pendientes sin revisar' })
+    fireEvent.click(notificationButton)
+    expect(screen.getByRole('dialog', { name: 'Notificaciones pendientes' })).toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Abrir menú de navegación' }))
+    const drawer = screen.getByRole('dialog', { name: 'Navegación de módulos' })
+    const hamburger = within(header).getByRole('button', { name: 'Cerrar menú de navegación' })
+
+    expect(screen.queryByRole('dialog', { name: 'Notificaciones pendientes' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Cambiar al tema claro' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('combobox', { name: 'Tema visual' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /Notificaciones:/ })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Cerrar sesión' })).not.toBeInTheDocument()
+    expect(header.querySelector('.ops-navbar-actions')).toHaveAttribute('inert')
+    expect(header.querySelector('.ops-navbar-header > div[aria-hidden="true"]')).toHaveAttribute('inert')
+    const appContent = screen.getByText('Espacio de trabajo').closest('main')?.parentElement?.parentElement
+    expect(appContent).toHaveAttribute('inert')
+    expect(within(header).getAllByRole('button')).toEqual([hamburger])
+    expect(within(drawer).getByRole('button', { name: 'Cerrar navegación de módulos' })).toBeInTheDocument()
+    expect(within(drawer).getByRole('navigation', { name: 'Navegación de módulos' })).toBeInTheDocument()
+    expect(screen.getAllByRole('button').every((button) => button === hamburger || drawer.contains(button))).toBe(true)
+  })
+
+  it('moves focus into the drawer, traps Tab, and restores focus to the hamburger', () => {
+    const onModuleChange = vi.fn()
+    render(<AppShell activeModule="catalog" onModuleChange={onModuleChange}><p>Espacio de trabajo</p></AppShell>)
+    const menuButton = screen.getByRole('button', { name: 'Abrir menú de navegación' })
+
+    fireEvent.click(menuButton)
+    const drawer = screen.getByRole('dialog', { name: 'Navegación de módulos' })
+    const closeButton = within(drawer).getByRole('button', { name: 'Cerrar navegación de módulos' })
+    const navigation = within(drawer).getByRole('navigation', { name: 'Navegación de módulos' })
+    const lastNavigationButton = within(navigation).getAllByRole('button').at(-1)
+
+    expect(document.activeElement).toBe(closeButton)
+    expect(lastNavigationButton).toBeDefined()
+    fireEvent.keyDown(closeButton, { key: 'Tab', shiftKey: true })
+    expect(document.activeElement).toBe(lastNavigationButton)
+    fireEvent.keyDown(lastNavigationButton!, { key: 'Tab' })
+    expect(document.activeElement).toBe(closeButton)
+
+    fireEvent.keyDown(document, { key: 'Escape' })
+    expect(screen.queryByRole('dialog', { name: 'Navegación de módulos' })).not.toBeInTheDocument()
+    expect(document.activeElement).toBe(menuButton)
+  })
+
+  it('activates and closes the navigation drawer on the first pointer interaction', () => {
     const onModuleChange = vi.fn()
     render(<AppShell activeModule="catalog" onModuleChange={onModuleChange}><p>Espacio de trabajo</p></AppShell>)
     fireEvent.click(screen.getByRole('button', { name: 'Abrir menú de navegación' }))

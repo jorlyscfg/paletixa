@@ -735,7 +735,7 @@
   .ops-mobile-action-bar {
     position: fixed;
     inset-inline: 0;
-    bottom: 0;
+    bottom: var(--ops-viewport-bottom-inset, 0px);
     z-index: 40;
     border-top: 1px solid var(--ops-border-strong);
     background: rgb(15 23 42 / 0.95);
@@ -845,39 +845,6 @@
     justify-content: center;
     border-radius: var(--ops-control-radius);
     padding: 0;
-  }
-
-  .ops-theme-select {
-    min-height: var(--ops-control-height);
-    width: 6.25rem;
-    border: 1px solid var(--ops-border);
-    border-radius: var(--ops-control-radius);
-    background: var(--ops-control);
-    color: var(--ops-text);
-    padding: 0.625rem 1.75rem 0.625rem 0.75rem;
-    font-size: 0.75rem;
-    font-weight: 700;
-    line-height: 1.25rem;
-    text-overflow: ellipsis;
-    transition: background-color var(--ops-control-transition), border-color var(--ops-control-transition), color var(--ops-control-transition), box-shadow var(--ops-control-transition);
-  }
-
-  .ops-theme-select:hover {
-    border-color: var(--ops-border-strong);
-    background: var(--ops-control-hover);
-  }
-
-  .ops-theme-select:focus-visible {
-    border-color: var(--ops-border-selected);
-    box-shadow: 0 0 0 3px rgb(203 213 225 / 0.16);
-    outline: none;
-  }
-
-  @media (max-width: 30rem) {
-    .ops-theme-select {
-      width: 5rem;
-      padding-inline: 0.5rem 1.5rem;
-    }
   }
 
   .ops-nav-button {
@@ -1109,8 +1076,7 @@
     color: #3d1b22;
   }
 
-  [data-theme='brand'] .ops-control:focus-visible,
-  [data-theme='brand'] .ops-theme-select:focus-visible {
+  [data-theme='brand'] .ops-control:focus-visible {
     box-shadow: 0 0 0 3px rgb(181 45 88 / 0.24);
   }
 

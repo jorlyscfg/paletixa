@@ -1,5 +1,5 @@
 import { useCallback, useLayoutEffect, useRef, useState, type ReactNode } from 'react'
-import { applyTheme, getInitialTheme, persistTheme, ThemeContext, type Theme } from './theme'
+import { applyTheme, getInitialTheme, getNextTheme, persistTheme, ThemeContext, type Theme } from './theme'
 
 export function ThemeProvider({ children }: { children: ReactNode }) {
   const [theme, setThemeState] = useState<Theme>(getInitialTheme)
@@ -13,7 +13,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
   }, [])
 
   const toggleTheme = useCallback(() => {
-    setTheme(themeRef.current === 'light' ? 'dark' : 'light')
+    setTheme(getNextTheme(themeRef.current))
   }, [setTheme])
 
   useLayoutEffect(() => {

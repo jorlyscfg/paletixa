@@ -58,46 +58,59 @@ describe('app theme', () => {
     expect(screen.getByText('brand')).toBeInTheDocument()
   })
 
-  it('exposes an accessible 44px-compatible toggle and persists changes', () => {
+  it('exposes an accessible 44px-compatible theme cycle button', () => {
     render(<ThemeProvider><ThemeToggle /></ThemeProvider>)
 
-    const toggle = screen.getByRole('button', { name: 'Cambiar a modo claro' })
-    expect(toggle).toHaveAttribute('title', 'Cambiar a modo claro')
-    expect(toggle).toHaveAttribute('aria-pressed', 'false')
+    const toggle = screen.getByRole('button', { name: 'Cambiar al tema claro' })
+    expect(toggle).toHaveAttribute('title', 'Cambiar al tema claro')
+    expect(toggle).not.toHaveAttribute('aria-pressed')
     expect(toggle).toHaveClass('ops-icon-button')
     expect(toggle.querySelector('[data-icon="sun"]')).toBeInTheDocument()
-    expect(screen.getByRole('combobox', { name: 'Tema visual' })).toHaveValue('brand')
+    expect(screen.queryByRole('combobox')).not.toBeInTheDocument()
 
     fireEvent.click(toggle)
 
-    expect(screen.getByRole('button', { name: 'Cambiar a modo oscuro' })).toHaveAttribute('aria-pressed', 'true')
-    expect(screen.getByRole('button', { name: 'Cambiar a modo oscuro' }).querySelector('[data-icon="moon"]')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Cambiar al tema oscuro' }).querySelector('[data-icon="moon"]')).toBeInTheDocument()
     expect(window.localStorage.getItem(THEME_STORAGE_KEY)).toBe('light')
     expect(document.documentElement).toHaveAttribute('data-theme', 'light')
   })
 
-  it('applies and persists the brand theme from the selector', () => {
-    window.localStorage.setItem(THEME_STORAGE_KEY, 'light')
+  it('cycles through brand, light, and dark themes with the accessible button', () => {
     render(<ThemeProvider><ThemeProbe /><ThemeToggle /></ThemeProvider>)
+    const transitions = [
+      { theme: 'brand', nextTheme: 'light', nextLabel: 'Cambiar al tema claro', icon: 'sun' },
+      { theme: 'light', nextTheme: 'dark', nextLabel: 'Cambiar al tema oscuro', icon: 'moon' },
+      { theme: 'dark', nextTheme: 'brand', nextLabel: 'Cambiar al tema de marca', icon: 'refresh' },
+    ] as const
 
-    fireEvent.change(screen.getByRole('combobox', { name: 'Tema visual' }), { target: { value: 'brand' } })
-
-    expect(screen.getByText('brand')).toBeInTheDocument()
-    expect(window.localStorage.getItem(THEME_STORAGE_KEY)).toBe('brand')
-    expect(document.documentElement).toHaveAttribute('data-theme', 'brand')
-    expect(document.documentElement.style.colorScheme).toBe('light')
+    for (const transition of transitions) {
+      const button = screen.getByRole('button', { name: transition.nextLabel })
+      expect(screen.getByText(transition.theme)).toBeInTheDocument()
+      expect(button).toHaveAttribute('title', transition.nextLabel)
+      expect(button.querySelector(`[data-icon="${transition.icon}"]`)).toBeInTheDocument()
+      fireEvent.click(button)
+      expect(screen.getByText(transition.nextTheme)).toBeInTheDocument()
+      expect(document.documentElement).toHaveAttribute('data-theme', transition.nextTheme)
+      expect(window.localStorage.getItem(THEME_STORAGE_KEY)).toBe(transition.nextTheme)
+    }
   })
 
-  it('lets users select light, dark, and brand through the accessible selector', () => {
-    render(<ThemeProvider><ThemeProbe /><ThemeToggle /></ThemeProvider>)
-    const selector = screen.getByRole('combobox', { name: 'Tema visual' })
+  it('cycles and persists themes when the toggle is rendered without a provider', () => {
+    const view = render(<ThemeToggle />)
 
-    for (const selectedTheme of ['light', 'dark', 'brand']) {
-      fireEvent.change(selector, { target: { value: selectedTheme } })
-      expect(selector).toHaveValue(selectedTheme)
-      expect(screen.getByText(selectedTheme)).toBeInTheDocument()
-      expect(document.documentElement).toHaveAttribute('data-theme', selectedTheme)
-      expect(window.localStorage.getItem(THEME_STORAGE_KEY)).toBe(selectedTheme)
+    for (const transition of [
+      { nextTheme: 'light', label: 'Cambiar al tema claro' },
+      { nextTheme: 'dark', label: 'Cambiar al tema oscuro' },
+      { nextTheme: 'brand', label: 'Cambiar al tema de marca' },
+    ] as const) {
+      fireEvent.click(screen.getByRole('button', { name: transition.label }))
+      expect(document.documentElement).toHaveAttribute('data-theme', transition.nextTheme)
+      expect(window.localStorage.getItem(THEME_STORAGE_KEY)).toBe(transition.nextTheme)
     }
+
+    view.unmount()
+    render(<ThemeToggle />)
+    expect(screen.getByRole('button', { name: 'Cambiar al tema claro' })).toBeInTheDocument()
+    expect(document.documentElement).toHaveAttribute('data-theme', 'brand')
   })
 })

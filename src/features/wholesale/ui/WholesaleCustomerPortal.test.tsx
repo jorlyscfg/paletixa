@@ -103,9 +103,9 @@ describe('WholesaleCustomerPortal', () => {
     await screen.findByRole('heading', { name: 'Tienda La Plaza' })
 
     const banner = screen.getByRole('banner')
-    expect(banner).toContainElement(screen.getByRole('button', { name: 'Cambiar a modo claro' }))
+    expect(banner).toContainElement(screen.getByRole('button', { name: 'Cambiar al tema claro' }))
     expect(banner).toHaveClass('ops-navbar-header')
-    expect(screen.getByRole('button', { name: 'Cambiar a modo claro' })).toHaveClass('ops-navbar-action')
+    expect(screen.getByRole('button', { name: 'Cambiar al tema claro' })).toHaveClass('ops-navbar-action')
     expect(within(banner).getByRole('button', { name: 'Información del portal mayorista' })).toHaveClass('ops-navbar-action')
     expect(within(banner).getByRole('button', { name: /^Notificaciones:/ })).toHaveClass('ops-navbar-action')
   })
