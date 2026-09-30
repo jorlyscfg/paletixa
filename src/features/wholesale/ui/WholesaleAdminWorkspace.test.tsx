@@ -15,6 +15,14 @@ import { WholesaleCustomersWorkspace } from './WholesaleCustomersWorkspace'
 
 const customer: WholesaleCustomer = { id: 'customer-1', name: 'Tienda La Plaza', mobile: '+525512345678', email: null, status: 'active', currentPin: '0042', createdAt: '2026-08-23T00:00:00Z', updatedAt: '2026-08-23T00:00:00Z' }
 const catalog = [{ id: 'product-1', name: 'Mango', sku: 'M-01', categoryId: 'category-1', category: 'Paletas', retailPriceMxn: 12.5, wholesalePriceMxn: 10, imageUrl: 'https://cdn.example.com/mango.jpg' }]
+const fourProductCatalog = Array.from({ length: 4 }, (_, index) => ({
+  ...catalog[0],
+  id: `product-${index + 1}`,
+  name: `Mango ${index + 1}`,
+  sku: `M-${String(index + 1).padStart(2, '0')}`,
+  categoryId: `category-${index + 1}`,
+  category: `Paletas ${index + 1}`,
+}))
 const order: WholesaleOrder = {
   id: 'order-1', customerId: 'customer-1', customerName: customer.name, customerMobile: '+525512345678', customerEmail: null, status: 'pending', paymentMethod: 'cash', transferTicket: null, totalMxn: 25, saleId: null, source: 'customer', createdAt: '2026-08-23T00:00:00Z', updatedAt: '2026-08-23T00:00:00Z', completedAt: null, cancelledAt: null, deletedAt: null, paymentAmount: null, paymentCurrency: null, paymentConfirmedAt: null, paymentConfirmedBy: null, paymentReference: null, paymentNote: null, deliveryAgreement: null, adminSeenAt: '2026-08-23T00:01:00Z', adminSeenBy: 'admin-1', reorderedFromOrderId: null, saleGeneration: null, items: [{ id: 'item-1', lineKind: 'product', productId: 'product-1', categoryId: null, categoryName: null, productName: 'Mango', unitPriceMxn: 12.5, quantity: 2, lineTotalMxn: 25 }],
 }
@@ -194,10 +202,41 @@ describe('WholesaleAdminWorkspace', () => {
     const selectedLines = screen.getByTestId('wholesale-selected-lines')
     const summary = screen.getByRole('complementary', { name: 'Resumen del pedido' })
     const reviewForm = screen.getByRole('button', { name: 'Crear pedido' }).closest('form')
-    expect(selectedLines).toHaveClass('max-h-[min(28rem,42dvh)]', 'overflow-y-auto', 'lg:min-h-0', 'lg:flex-1', 'lg:max-h-none', 'lg:overflow-y-auto', 'lg:overscroll-contain', 'flex-1')
-    expect(summary).toHaveClass('flex-1', 'min-h-0', 'flex-col', 'overflow-hidden', 'lg:h-full', 'lg:min-h-0', 'lg:flex-1', 'lg:flex-col', 'lg:overflow-hidden')
+    expect(selectedLines).toHaveClass('flex-none', 'max-h-none', 'overflow-visible')
+    expect(selectedLines).not.toHaveClass('overflow-y-auto', 'lg:overflow-y-auto')
+    expect(summary).toHaveClass('flex-1', 'min-h-0', 'flex-col', 'overflow-y-auto', 'overscroll-contain', 'lg:h-full', 'lg:min-h-0', 'lg:flex-1', 'lg:flex-col', 'lg:overflow-y-auto', 'lg:overscroll-contain')
+    expect(summary).not.toHaveClass('overflow-hidden', 'lg:overflow-hidden')
     expect(reviewForm).toHaveClass('flex', 'flex-1', 'min-h-0', 'flex-col', 'gap-2', 'overflow-hidden', 'lg:flex-1', 'lg:min-h-0', 'lg:overflow-hidden')
     expect(selectedLines).not.toContainElement(screen.getByRole('group', { name: 'Método de pago' }))
+  })
+
+  it('scrolls admin selected lines only after more than three product lines', async () => {
+    api.catalog.mockResolvedValue(fourProductCatalog)
+    render(<WholesaleAdminWorkspace />)
+    await screen.findByRole('tab', { name: 'Gestionar pedidos' })
+    fireEvent.click(screen.getByRole('tab', { name: 'Crear pedido' }))
+    fireEvent.click(screen.getByRole('tab', { name: 'Vista por producto' }))
+
+    for (const product of fourProductCatalog.slice(0, 3)) {
+      fireEvent.click(await screen.findByRole('button', { name: `Agregar ${product.name} al pedido` }))
+    }
+    fireEvent.click(screen.getByRole('button', { name: 'Revisar pedido' }))
+
+    const summary = screen.getByRole('complementary', { name: 'Resumen del pedido' })
+    let selectedLines = screen.getByTestId('wholesale-selected-lines')
+    expect(within(selectedLines).getAllByRole('listitem')).toHaveLength(3)
+    expect(selectedLines).toHaveClass('flex-none', 'max-h-none', 'overflow-visible')
+    expect(selectedLines).not.toHaveClass('overflow-y-auto')
+    expect(summary).toHaveClass('overflow-y-auto', 'lg:overflow-y-auto')
+
+    fireEvent.click(screen.getByRole('button', { name: 'Volver al catálogo' }))
+    fireEvent.click(await screen.findByRole('button', { name: `Agregar ${fourProductCatalog[3].name} al pedido` }))
+    fireEvent.click(screen.getByRole('button', { name: 'Revisar pedido' }))
+
+    selectedLines = screen.getByTestId('wholesale-selected-lines')
+    expect(within(selectedLines).getAllByRole('listitem')).toHaveLength(4)
+    expect(selectedLines).toHaveClass('flex-none', 'max-h-[min(28rem,42dvh)]', 'overflow-y-auto', 'overscroll-contain')
+    expect(summary).toHaveClass('overflow-y-auto', 'overscroll-contain', 'lg:overflow-y-auto', 'lg:overscroll-contain')
   })
 
   it('focuses and marks the requested order after the order list loads', async () => {

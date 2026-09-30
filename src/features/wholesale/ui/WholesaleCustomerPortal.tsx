@@ -467,7 +467,7 @@ type WholesaleTicketReference = {
   onChange: (value: { url: string; key: string }) => void
 }
 
-export function CustomerOrderSummary({ draft, catalog, ticketBusy = false, submitBusy = false, mobileReview, onChange, onClear, onPaymentChange, onTicketSelect, onTicketRemove, ticketReference, submitLabel, submitLoadingLabel, variant = 'wholesale', showPaymentPanel = true, beforeSubmit, formatMoney = formatWholesaleMoney }: {
+export function CustomerOrderSummary({ draft, catalog, ticketBusy = false, submitBusy = false, mobileReview, onChange, onClear, onPaymentChange, onTicketSelect, onTicketRemove, ticketReference, submitLabel, submitLoadingLabel, variant = 'wholesale', showPaymentPanel = true, beforeSubmit, formatMoney = formatWholesaleMoney, scrollableSummary = false }: {
   draft: WholesaleDraft
   catalog: WholesaleCatalogProduct[]
   ticketBusy?: boolean
@@ -485,12 +485,14 @@ export function CustomerOrderSummary({ draft, catalog, ticketBusy = false, submi
   showPaymentPanel?: boolean
   beforeSubmit?: ReactNode
   formatMoney?: MoneyFormatter
+  scrollableSummary?: boolean
 }) {
   const [summaryInfoOpen, setSummaryInfoOpen] = useState(false)
   const [totalInfoOpen, setTotalInfoOpen] = useState(false)
   const ticketInputRef = useRef<HTMLInputElement>(null)
   const draftAction = getWholesaleDraftAction(draft)
   const isEventVariant = variant === 'event'
+  const isScrollableSummary = isEventVariant || scrollableSummary
   const total = getWholesaleDraftTotal(draft, catalog)
   const cartItems = toWholesaleOrderItems(draft.items).map((item) => item.lineKind === 'category'
     ? { ...item, category: catalog.find(({ categoryId }) => categoryId === item.categoryId) ?? null }
@@ -520,11 +522,11 @@ export function CustomerOrderSummary({ draft, catalog, ticketBusy = false, submi
     ticketInputRef.current?.click()
   }
 
-  const selectedLinesClassName = isEventVariant
+  const selectedLinesClassName = isScrollableSummary
     ? `flex-none ${cartItems.length > 3 ? 'max-h-[min(28rem,42dvh)] overflow-y-auto overscroll-contain' : 'max-h-none overflow-visible'} divide-y divide-slate-800 pr-1`
     : `min-h-0 max-h-[min(28rem,42dvh)] overflow-y-auto overscroll-contain divide-y divide-slate-800 pr-1 ${mobileReview ? 'flex-1' : ''} lg:min-h-0 lg:flex-1 lg:max-h-none lg:overflow-y-auto lg:overscroll-contain`
 
-    return <aside aria-label={isEventVariant ? 'Resumen de la reserva' : 'Resumen del pedido'} className={`${mobileReview ? `flex min-h-0 flex-1 flex-col ${isEventVariant ? 'overflow-y-auto overscroll-contain' : 'overflow-hidden'}` : 'h-fit'} min-w-0 rounded-2xl border border-slate-800 bg-slate-900/85 p-3 shadow-xl sm:p-4 lg:flex lg:h-full lg:min-h-0 lg:flex-1 lg:flex-col ${isEventVariant ? 'lg:overflow-y-auto lg:overscroll-contain' : 'lg:overflow-hidden'} lg:sticky lg:top-6`}>
+    return <aside aria-label={isEventVariant ? 'Resumen de la reserva' : 'Resumen del pedido'} className={`${mobileReview ? `flex min-h-0 flex-1 flex-col ${isScrollableSummary ? 'overflow-y-auto overscroll-contain' : 'overflow-hidden'}` : 'h-fit'} min-w-0 rounded-2xl border border-slate-800 bg-slate-900/85 p-3 shadow-xl sm:p-4 lg:flex lg:h-full lg:min-h-0 lg:flex-1 lg:flex-col ${isScrollableSummary ? 'lg:overflow-y-auto lg:overscroll-contain' : 'lg:overflow-hidden'} lg:sticky lg:top-6`}>
       <div className="flex min-w-0 shrink-0 items-center justify-between gap-3 border-b border-slate-800 pb-3">
          <div className="flex min-w-0 flex-1 items-center gap-1"><div className="min-w-0"><p className="text-xs font-bold uppercase tracking-[0.12em] text-sky-400">{isEventVariant ? 'Reserva' : 'Pedido'}</p><h2 className="mt-1 truncate text-lg font-black text-white">{isEventVariant ? 'Resumen de la reserva' : 'Resumen del carrito'}</h2></div><InfoButton id={`${variant}-summary-info`} label="Explicar el carrito" open={summaryInfoOpen} onToggle={() => setSummaryInfoOpen((current) => !current)}>La solicitud se envía con productos, categorías y cantidades.</InfoButton></div>
           {cartItems.length > 0 && <div className="flex shrink-0 items-center gap-2"><span aria-label={`${itemCount} artículos`} className="inline-flex min-h-8 min-w-8 items-center justify-center rounded-full border border-slate-700 bg-slate-950 px-2 text-xs font-black text-slate-200">{itemCount}</span><ResponsiveActionButton type="button" label="Vaciar carrito" icon="close" onClick={() => void onClear()} disabled={ticketBusy || submitBusy} className="shrink-0" /></div>}
