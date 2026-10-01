@@ -35,6 +35,30 @@ import { DEFAULT_POS_USD_MXN_RATE, type PosShift } from '../api/posShifts'
 import { buildPosCatalogCategories, createRequestId, getPosCashChange, getPosCategoryPriceLabel, getPosCategoryQuantityById, getPosCategoryUnitPrice, getPosPriceLabel, getPosUsdReceivedMxn, getPosUnitPrice, getValidatedCategoryPrice, isPosWholesaleQuantity, type PosCatalogCategory } from './posUtils'
 import { PosTicketPreview } from './PosTicketPreview'
 
+const POS_LANDSCAPE_MEDIA_QUERY = '(orientation: landscape) and (min-width: 40rem) and (max-width: 63.999rem)'
+
+function useMediaQuery(query: string, enabled = true) {
+  const [matches, setMatches] = useState(false)
+
+  useEffect(() => {
+    if (!enabled || typeof window === 'undefined' || typeof window.matchMedia !== 'function') return
+
+    const mediaQuery = window.matchMedia(query)
+    const handleChange = (event?: MediaQueryListEvent) => setMatches(event?.matches ?? mediaQuery.matches)
+    handleChange()
+
+    if (typeof mediaQuery.addEventListener === 'function') {
+      mediaQuery.addEventListener('change', handleChange)
+      return () => mediaQuery.removeEventListener('change', handleChange)
+    }
+
+    mediaQuery.addListener(handleChange)
+    return () => mediaQuery.removeListener(handleChange)
+  }, [enabled, query])
+
+  return enabled && matches
+}
+
 type QuantityByLine = Record<string, string>
 type Submission = { status: 'submitting' | 'error' | 'success'; requestId: string; receipt?: SaleReceipt }
 type SaleFormState = {
@@ -513,6 +537,7 @@ export function SalesWorkspace(props: SalesWorkspaceProps) {
 
 function SalesWorkspaceContent({ channel, branchName, cashierName, activeShift, ticketImageUrl, initialViewMode = 'categories', mobileFooterBleed = 'admin' }: SalesWorkspaceProps) {
   const persistence = useAdminSessionPersistence()
+  const isPosLandscapeMode = useMediaQuery(POS_LANDSCAPE_MEDIA_QUERY, channel === 'pos')
   const navigationDrawerOpen = useContext(NavigationDrawerOpenContext)?.isOpen ?? false
   const sessionModule = `sales:${channel}`
   const [restoredSession] = useState<SalesSessionState>(() => persistence?.read(sessionModule, isSalesSessionState) ?? {
@@ -771,8 +796,8 @@ function SalesWorkspaceContent({ channel, branchName, cashierName, activeShift, 
       lineTotalMxn: unitPriceMxn * item.quantity,
     }
   })
-  const isPosMobileReview = channel === 'pos' && mobileCheckoutStep === 'review'
-  const isPosMobileCatalog = channel === 'pos' && mobileCheckoutStep === 'catalog'
+  const isPosMobileReview = channel === 'pos' && !isPosLandscapeMode && mobileCheckoutStep === 'review'
+  const isPosMobileCatalog = channel === 'pos' && !isPosLandscapeMode && mobileCheckoutStep === 'catalog'
   const selectedLinesLayout = channel === 'pos'
     ? `ops-scroll-region flex-none ${cartItems.length > 3 ? 'max-h-[min(28rem,42dvh)] overflow-y-auto overscroll-contain' : 'max-h-none overflow-visible'} lg:min-h-0 lg:flex-none lg:pr-1`
     : ''
@@ -785,7 +810,7 @@ function SalesWorkspaceContent({ channel, branchName, cashierName, activeShift, 
         <p className="mt-2 max-w-2xl text-sm leading-relaxed text-slate-400">{presentation.description}</p>
     </div>}
 
-    <form ref={salesFormRef} noValidate onSubmit={reviewSale} data-testid={channel === 'pos' ? 'pos-sales-form' : undefined} className={`${channel === 'pos' ? (isPosMobileReview ? 'mt-0' : 'mt-2') : 'mt-7'} ${isPosMobileReview ? 'flex min-h-0 flex-1 flex-col overflow-hidden gap-2 lg:grid' : 'grid min-h-0 flex-1 grid-rows-[minmax(0,1fr)_auto] gap-4 overflow-hidden lg:grid-rows-[minmax(0,1fr)]'} min-w-0 lg:gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(19rem,24rem)] ${channel === 'pos' ? 'lg:min-h-0 lg:flex-1 lg:overflow-hidden' : ''}`}>
+    <form ref={salesFormRef} noValidate onSubmit={reviewSale} data-testid={channel === 'pos' ? 'pos-sales-form' : undefined} className={`${channel === 'pos' ? (isPosMobileReview ? 'mt-0' : 'mt-2') : 'mt-7'} ${isPosLandscapeMode ? 'grid min-h-0 flex-1 grid-cols-[minmax(0,1fr)_minmax(16rem,18rem)] grid-rows-[minmax(0,1fr)] gap-3 overflow-hidden' : isPosMobileReview ? 'flex min-h-0 flex-1 flex-col overflow-hidden gap-2 lg:grid' : 'grid min-h-0 flex-1 grid-rows-[minmax(0,1fr)_auto] gap-4 overflow-hidden lg:grid-rows-[minmax(0,1fr)]'} min-w-0 lg:gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(19rem,24rem)] ${channel === 'pos' ? 'lg:min-h-0 lg:flex-1 lg:overflow-hidden' : ''}`}>
       <div data-testid={channel === 'pos' ? 'pos-catalog-column' : undefined} className={`min-w-0 flex min-h-0 flex-col overflow-hidden ${channel === 'pos' ? 'lg:flex' : 'lg:block'} ${isPosMobileReview ? 'hidden' : ''}`}>
         {channel !== 'pos' && <section aria-labelledby="product-list-title" className="border-b border-slate-800 pb-4">
           <div className="flex flex-wrap items-end justify-between gap-3">
@@ -908,7 +933,7 @@ function SalesWorkspaceContent({ channel, branchName, cashierName, activeShift, 
       </div>
 
             {isPosMobileReview && <div data-testid="pos-mobile-review-header" className="order-0 mb-0 flex shrink-0 items-center justify-between gap-3 lg:order-none lg:hidden"><div><p className="text-xs font-bold uppercase tracking-[0.12em] text-sky-400">Paso 2 de 2</p></div><ResponsiveActionButton type="button" label="Volver al catálogo" icon="chevron-left" showLabel onClick={() => setMobileCheckoutStep('catalog')} /></div>}
-              <aside data-testid={channel === 'pos' ? 'pos-summary-column' : undefined} aria-label={confirmationModalOpen ? 'Confirmar registro de venta' : 'Resumen del carrito'} className={`${isPosMobileCatalog ? 'hidden' : ''} ${isPosMobileReview ? `flex min-h-0 flex-1 flex-col ${channel === 'pos' ? 'overflow-y-auto overscroll-contain' : 'overflow-hidden'}` : 'h-fit'} rounded-2xl border bg-slate-900/85 p-3 shadow-xl sm:p-4 ${channel === 'pos' ? 'lg:static lg:flex lg:h-full lg:min-h-0 lg:flex-none lg:flex-col lg:overflow-y-auto lg:overscroll-contain' : 'lg:sticky lg:top-6 lg:block'} ${confirmationModalOpen ? presentation.cardBorderClass : 'border-slate-800'}`}>
+              <aside data-testid={channel === 'pos' ? 'pos-summary-column' : undefined} aria-label={confirmationModalOpen ? 'Confirmar registro de venta' : 'Resumen del carrito'} className={`${isPosMobileCatalog ? 'hidden' : ''} ${isPosLandscapeMode ? 'flex h-full min-h-0 min-w-0 flex-col overflow-y-auto overscroll-contain' : isPosMobileReview ? `flex min-h-0 flex-1 flex-col ${channel === 'pos' ? 'overflow-y-auto overscroll-contain' : 'overflow-hidden'}` : 'h-fit'} rounded-2xl border bg-slate-900/85 p-3 shadow-xl sm:p-4 ${channel === 'pos' ? 'lg:static lg:flex lg:h-full lg:min-h-0 lg:flex-none lg:flex-col lg:overflow-y-auto lg:overscroll-contain' : 'lg:sticky lg:top-6 lg:block'} ${confirmationModalOpen ? presentation.cardBorderClass : 'border-slate-800'}`}>
               {cartItems.length > 0 && <div data-testid={channel === 'pos' ? 'pos-summary-sticky-header' : undefined} className={`flex items-center justify-between gap-3 border-b border-slate-800 pb-3 ${channel === 'pos' ? 'sticky top-0 z-20 -mx-3 -mt-3 shrink-0 bg-slate-900 px-3 pt-3 sm:-mx-4 sm:-mt-4 sm:px-4 sm:pt-4' : ''} ${isPosMobileReview ? 'shrink-0' : ''} lg:shrink-0`}>
              <span aria-label={`${itemCount} ${itemCount === 1 ? 'artículo' : 'artículos'}`} className="inline-flex min-h-8 min-w-8 items-center justify-center rounded-full border border-slate-700 bg-slate-950 px-2 text-xs font-black text-slate-200">{itemCount}</span>
              <div className="flex shrink-0 items-center justify-end gap-2">

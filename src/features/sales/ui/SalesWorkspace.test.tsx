@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { AppProviders } from '../../../app/AppProviders'
 import { createAdminSessionStorageKey } from '../../../app/sessionPersistence'
@@ -60,9 +60,48 @@ const receipt: salesApi.SaleReceipt = { id: 'sale-1', channel: 'pos', totalMxn: 
 const usdReceipt: salesApi.SaleReceipt = { ...receipt, paymentMethod: 'cash', paymentCurrency: 'usd', usdMxnRate: 17, usdEquivalent: 5, usdPaid: 6, receivedMxn: 102, changeMxn: 17 }
 const renderProtected = (channel: salesApi.SalesChannel = 'pos', branchName?: string, activeShift?: PosShift, initialViewMode: 'products' | 'categories' = 'products') => render(<AppProviders><AdminBoundary><SalesWorkspace channel={channel} branchName={branchName} activeShift={activeShift} initialViewMode={initialViewMode} /></AdminBoundary></AppProviders>)
 
+function installMatchMedia(initialMatches = false) {
+  let matches = initialMatches
+  let query = ''
+  const listeners = new Set<(event: MediaQueryListEvent) => void>()
+  const originalDescriptor = Object.getOwnPropertyDescriptor(window, 'matchMedia')
+  const mediaQuery = {
+    get matches() { return matches },
+    get media() { return query },
+    onchange: null,
+    addEventListener: (_type: string, listener: (event: MediaQueryListEvent) => void) => listeners.add(listener),
+    removeEventListener: (_type: string, listener: (event: MediaQueryListEvent) => void) => listeners.delete(listener),
+    addListener: (listener: (event: MediaQueryListEvent) => void) => listeners.add(listener),
+    removeListener: (listener: (event: MediaQueryListEvent) => void) => listeners.delete(listener),
+    dispatchEvent: () => true,
+  } as unknown as MediaQueryList
+  const matchMedia = vi.fn((value: string) => {
+    query = value
+    return mediaQuery
+  })
+  Object.defineProperty(window, 'matchMedia', { configurable: true, writable: true, value: matchMedia })
+
+  return {
+    matchMedia,
+    setMatches(next: boolean) {
+      matches = next
+      const event = { matches, media: query, target: mediaQuery, currentTarget: mediaQuery } as MediaQueryListEvent
+      listeners.forEach((listener) => listener(event))
+    },
+    restore() {
+      if (originalDescriptor) Object.defineProperty(window, 'matchMedia', originalDescriptor)
+      else Reflect.deleteProperty(window, 'matchMedia')
+    },
+  }
+}
+
+let restoreMatchMedia: (() => void) | undefined
+
 describe('sales workspace', () => {
   afterEach(() => {
     cleanup()
+    restoreMatchMedia?.()
+    restoreMatchMedia = undefined
     sessionStorage.clear()
     localStorage.clear()
     vi.restoreAllMocks()
@@ -354,6 +393,42 @@ describe('sales workspace', () => {
      expect(screen.getByRole('button', { name: 'Revisar venta' })).toBeEnabled()
      expect(screen.getByTestId('pos-selected-lines')).not.toHaveClass('overflow-y-auto', 'overscroll-contain', 'flex-1')
      expect(screen.getByTestId('pos-mobile-summary-bar')).toHaveClass('shrink-0', 'lg:hidden')
+  })
+
+  it('shows both POS columns in landscape and restores the previous mobile checkout step on return to portrait', async () => {
+    const media = installMatchMedia(false)
+    restoreMatchMedia = media.restore
+    renderProtected('pos')
+    await screen.findByRole('heading', { name: 'Mango' })
+
+    expect(media.matchMedia).toHaveBeenCalledWith('(orientation: landscape) and (min-width: 40rem) and (max-width: 63.999rem)')
+    expect(screen.getByTestId('pos-mobile-summary-bar')).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Agregar Mango a la venta' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Revisar venta' }))
+    expect(screen.getByTestId('pos-mobile-review-header')).toBeInTheDocument()
+    expect(screen.getByTestId('pos-catalog-column')).toHaveClass('hidden')
+
+    act(() => media.setMatches(true))
+
+    const form = screen.getByTestId('pos-sales-form')
+    const catalog = screen.getByTestId('pos-catalog-column')
+    const summary = screen.getByTestId('pos-summary-column')
+    expect(form).toHaveClass('grid-cols-[minmax(0,1fr)_minmax(16rem,18rem)]', 'grid-rows-[minmax(0,1fr)]', 'gap-3')
+    expect(catalog).not.toHaveClass('hidden')
+    expect(summary).not.toHaveClass('hidden')
+    expect(summary).toHaveClass('h-full', 'min-h-0', 'overflow-y-auto', 'overscroll-contain')
+    expect(summary).not.toHaveClass('fixed', 'absolute', 'lg:sticky')
+    expect(screen.queryByTestId('pos-mobile-summary-bar')).not.toBeInTheDocument()
+    expect(screen.queryByTestId('pos-mobile-review-header')).not.toBeInTheDocument()
+
+    act(() => media.setMatches(false))
+
+    expect(screen.getByTestId('pos-mobile-review-header')).toBeInTheDocument()
+    expect(screen.getByTestId('pos-catalog-column')).toHaveClass('hidden')
+    expect(screen.queryByTestId('pos-mobile-summary-bar')).not.toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Volver al catálogo' }))
+    expect(screen.getByTestId('pos-mobile-summary-bar')).toBeInTheDocument()
+    expect(screen.queryByTestId('pos-mobile-review-header')).not.toBeInTheDocument()
   })
 
   it('keeps the POS lines wrapper from shrinking into sale details while preserving 3-to-4 line scrolling', async () => {
