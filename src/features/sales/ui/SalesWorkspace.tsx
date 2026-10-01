@@ -773,6 +773,9 @@ function SalesWorkspaceContent({ channel, branchName, cashierName, activeShift, 
   })
   const isPosMobileReview = channel === 'pos' && mobileCheckoutStep === 'review'
   const isPosMobileCatalog = channel === 'pos' && mobileCheckoutStep === 'catalog'
+  const selectedLinesLayout = channel === 'pos'
+    ? `ops-scroll-region flex-none ${cartItems.length > 3 ? 'max-h-[min(28rem,42dvh)] overflow-y-auto overscroll-contain' : 'max-h-none overflow-visible'} lg:min-h-0 lg:flex-none lg:pr-1`
+    : ''
 
   const mobileFooterBleedClass = mobileFooterBleed === 'cashier' ? '-mb-3 sm:-mb-4 lg:mb-0' : '-mb-4 sm:-mb-6 lg:mb-0'
 
@@ -905,8 +908,8 @@ function SalesWorkspaceContent({ channel, branchName, cashierName, activeShift, 
       </div>
 
             {isPosMobileReview && <div data-testid="pos-mobile-review-header" className="order-0 mb-0 flex shrink-0 items-center justify-between gap-3 lg:order-none lg:hidden"><div><p className="text-xs font-bold uppercase tracking-[0.12em] text-sky-400">Paso 2 de 2</p></div><ResponsiveActionButton type="button" label="Volver al catálogo" icon="chevron-left" showLabel onClick={() => setMobileCheckoutStep('catalog')} /></div>}
-              <aside data-testid={channel === 'pos' ? 'pos-summary-column' : undefined} aria-label={confirmationModalOpen ? 'Confirmar registro de venta' : 'Resumen del carrito'} className={`${isPosMobileCatalog ? 'hidden' : ''} ${isPosMobileReview ? 'flex min-h-0 flex-1 flex-col overflow-hidden' : 'h-fit'} rounded-2xl border bg-slate-900/85 p-3 shadow-xl sm:p-4 ${channel === 'pos' ? 'lg:static lg:flex lg:h-full lg:min-h-0 lg:flex-none lg:flex-col lg:overflow-hidden' : 'lg:sticky lg:top-6 lg:block'} ${confirmationModalOpen ? presentation.cardBorderClass : 'border-slate-800'}`}>
-             {cartItems.length > 0 && <div className={`flex items-center justify-between gap-3 border-b border-slate-800 pb-3 ${isPosMobileReview ? 'shrink-0' : ''} lg:shrink-0`}>
+              <aside data-testid={channel === 'pos' ? 'pos-summary-column' : undefined} aria-label={confirmationModalOpen ? 'Confirmar registro de venta' : 'Resumen del carrito'} className={`${isPosMobileCatalog ? 'hidden' : ''} ${isPosMobileReview ? `flex min-h-0 flex-1 flex-col ${channel === 'pos' ? 'overflow-y-auto overscroll-contain' : 'overflow-hidden'}` : 'h-fit'} rounded-2xl border bg-slate-900/85 p-3 shadow-xl sm:p-4 ${channel === 'pos' ? 'lg:static lg:flex lg:h-full lg:min-h-0 lg:flex-none lg:flex-col lg:overflow-y-auto lg:overscroll-contain' : 'lg:sticky lg:top-6 lg:block'} ${confirmationModalOpen ? presentation.cardBorderClass : 'border-slate-800'}`}>
+              {cartItems.length > 0 && <div data-testid={channel === 'pos' ? 'pos-summary-sticky-header' : undefined} className={`flex items-center justify-between gap-3 border-b border-slate-800 pb-3 ${channel === 'pos' ? 'sticky top-0 z-20 -mx-3 -mt-3 shrink-0 bg-slate-900 px-3 pt-3 sm:-mx-4 sm:-mt-4 sm:px-4 sm:pt-4' : ''} ${isPosMobileReview ? 'shrink-0' : ''} lg:shrink-0`}>
              <span aria-label={`${itemCount} ${itemCount === 1 ? 'artículo' : 'artículos'}`} className="inline-flex min-h-8 min-w-8 items-center justify-center rounded-full border border-slate-700 bg-slate-950 px-2 text-xs font-black text-slate-200">{itemCount}</span>
              <div className="flex shrink-0 items-center justify-end gap-2">
                  {!isComplete && submission?.status !== 'error' && <ResponsiveActionButton
@@ -924,11 +927,11 @@ function SalesWorkspaceContent({ channel, branchName, cashierName, activeShift, 
              </div>
            </div>}
 
-           <div data-testid="pos-lines-section" className={channel === 'pos' ? 'min-h-0 min-w-0 flex flex-1 flex-col lg:flex-1' : isPosMobileReview ? 'min-h-0 min-w-0 flex flex-1 flex-col' : ''}>
+           <div data-testid="pos-lines-section" className={channel === 'pos' ? 'min-h-0 min-w-0 flex flex-none flex-col' : isPosMobileReview ? 'min-h-0 min-w-0 flex flex-1 flex-col' : ''}>
             {cartItems.length === 0 ? <div className="py-6 text-center">
              <p className="text-sm font-semibold text-slate-300">El carrito está vacío.</p>
              <p className="mt-2 text-xs leading-relaxed text-slate-500">Agrega productos del catálogo para iniciar una venta.</p>
-             </div> : <ul data-testid="pos-selected-lines" className={`divide-y divide-slate-800 ${channel === 'pos' ? 'ops-scroll-region' : ''} ${isPosMobileReview ? 'min-h-0 max-h-[min(28rem,42dvh)] overflow-y-auto overscroll-contain pr-1 flex-1 lg:max-h-none' : ''} ${channel === 'pos' ? 'lg:min-h-0 lg:flex-1 lg:overflow-y-auto lg:overscroll-contain lg:pr-1' : ''}`}>
+             </div> : <ul data-testid="pos-selected-lines" className={`divide-y divide-slate-800 ${selectedLinesLayout}`}>
              {cartItems.map((item) => {
                const value = quantities[item.key] ?? ''
                const quantity = parseQuantity(value)

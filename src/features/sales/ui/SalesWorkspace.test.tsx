@@ -41,6 +41,21 @@ const products: productApi.Product[] = [
   { id: 'product-1', name: 'Mango', sku: 'M-01', category: 'Paletas', categoryId: 'category-1', retailPriceMxn: 42.5, wholesalePriceMxn: 35, active: true, tags: ['fruta'], imageUrl: 'https://cdn.example.com/mango.jpg', imageKey: null, createdAt: '2026-08-20T00:00:00Z', updatedAt: '2026-08-20T00:00:00Z' },
   { id: 'product-2', name: 'Strawberry', sku: 'S-02', category: 'Creams', categoryId: 'category-2', retailPriceMxn: 28, wholesalePriceMxn: 22, active: true, tags: [], imageUrl: null, imageKey: null, createdAt: '2026-08-20T00:00:00Z', updatedAt: '2026-08-20T00:00:00Z' },
 ]
+const fourPosProducts: productApi.Product[] = Array.from({ length: 4 }, (_, index) => ({
+  id: `pos-scroll-product-${index + 1}`,
+  name: `POS Product ${index + 1}`,
+  sku: `POS-${index + 1}`,
+  category: `POS Category ${index + 1}`,
+  categoryId: `pos-category-${index + 1}`,
+  retailPriceMxn: 10,
+  wholesalePriceMxn: 8,
+  active: true,
+  tags: [],
+  imageUrl: null,
+  imageKey: null,
+  createdAt: '2026-08-20T00:00:00Z',
+  updatedAt: '2026-08-20T00:00:00Z',
+}))
 const receipt: salesApi.SaleReceipt = { id: 'sale-1', channel: 'pos', totalMxn: 85, createdAt: '2026-08-20T00:00:00Z', replayed: false }
 const usdReceipt: salesApi.SaleReceipt = { ...receipt, paymentMethod: 'cash', paymentCurrency: 'usd', usdMxnRate: 17, usdEquivalent: 5, usdPaid: 6, receivedMxn: 102, changeMxn: 17 }
 const renderProtected = (channel: salesApi.SalesChannel = 'pos', branchName?: string, activeShift?: PosShift, initialViewMode: 'products' | 'categories' = 'products') => render(<AppProviders><AdminBoundary><SalesWorkspace channel={channel} branchName={branchName} activeShift={activeShift} initialViewMode={initialViewMode} /></AdminBoundary></AppProviders>)
@@ -305,19 +320,22 @@ describe('sales workspace', () => {
      expect(form).not.toHaveClass('overflow-y-auto', 'overscroll-contain')
       const summary = screen.getByTestId('pos-summary-column')
       expect(summary).not.toHaveClass('hidden')
-      expect(summary).toHaveClass('flex', 'min-h-0', 'flex-1', 'flex-col', 'overflow-hidden', 'lg:flex', 'lg:h-full', 'lg:min-h-0', 'lg:overflow-hidden')
+      expect(summary).toHaveClass('flex', 'min-h-0', 'flex-1', 'flex-col', 'overflow-y-auto', 'overscroll-contain', 'lg:flex', 'lg:h-full', 'lg:min-h-0', 'lg:overflow-y-auto', 'lg:overscroll-contain')
+      expect(summary).not.toHaveClass('overflow-hidden', 'lg:overflow-hidden')
      expect(screen.getByTestId('pos-mobile-review-header')).toHaveClass('order-0', 'shrink-0')
-     const linesSection = screen.getByTestId('pos-lines-section')
-      expect(linesSection).toHaveClass('min-h-0', 'flex', 'flex-col', 'flex-1', 'lg:flex-1')
+      const linesSection = screen.getByTestId('pos-lines-section')
+      expect(linesSection).toHaveClass('min-h-0', 'min-w-0', 'flex', 'flex-col', 'flex-none')
+      expect(linesSection).not.toHaveClass('flex-1')
+      expect(linesSection).not.toHaveClass('lg:flex-1')
       expect(linesSection).not.toHaveClass('order-1')
       expect(linesSection).not.toHaveClass('overflow-y-auto', 'overscroll-contain')
       const saleDetails = screen.getByTestId('pos-sale-details')
       expect(saleDetails).toHaveClass('shrink-0', 'lg:shrink-0')
       expect(saleDetails).not.toHaveClass('order-2')
       const selectedLines = screen.getByTestId('pos-selected-lines')
-       expect(selectedLines).toHaveClass('min-h-0', 'max-h-[min(28rem,42dvh)]', 'overflow-y-auto', 'overscroll-contain', 'flex-1', 'lg:max-h-none', 'lg:min-h-0', 'lg:flex-1', 'lg:overflow-y-auto', 'lg:overscroll-contain')
+       expect(selectedLines).toHaveClass('ops-scroll-region', 'flex-none', 'max-h-none', 'overflow-visible', 'lg:min-h-0', 'lg:flex-none', 'lg:pr-1')
+      expect(selectedLines).not.toHaveClass('overflow-y-auto', 'overscroll-contain', 'flex-1', 'lg:overflow-y-auto')
       expect(selectedLines).toHaveClass('ops-scroll-region')
-      expect(selectedLines).not.toHaveClass('lg:overflow-visible', 'lg:flex-none')
       const visibleEstimate = screen.getByTestId('pos-visible-estimate')
       expect(visibleEstimate).toHaveClass('shrink-0', 'lg:shrink-0')
       expect(visibleEstimate).not.toHaveClass('order-3')
@@ -336,6 +354,50 @@ describe('sales workspace', () => {
      expect(screen.getByRole('button', { name: 'Revisar venta' })).toBeEnabled()
      expect(screen.getByTestId('pos-selected-lines')).not.toHaveClass('overflow-y-auto', 'overscroll-contain', 'flex-1')
      expect(screen.getByTestId('pos-mobile-summary-bar')).toHaveClass('shrink-0', 'lg:hidden')
+  })
+
+  it('keeps the POS lines wrapper from shrinking into sale details while preserving 3-to-4 line scrolling', async () => {
+    vi.mocked(productApi.listActiveProductsForPos).mockResolvedValue(fourPosProducts)
+    renderProtected('pos')
+    await screen.findByRole('heading', { name: 'POS Product 1' })
+
+    for (const product of fourPosProducts.slice(0, 3)) {
+      fireEvent.click(screen.getByRole('button', { name: `Agregar ${product.name} a la venta` }))
+    }
+    fireEvent.click(screen.getByRole('button', { name: 'Revisar venta' }))
+
+    const summary = screen.getByTestId('pos-summary-column')
+    const linesSection = screen.getByTestId('pos-lines-section')
+    const saleDetails = screen.getByTestId('pos-sale-details')
+    let selectedLines = screen.getByTestId('pos-selected-lines')
+    expect(linesSection).toHaveClass('min-w-0', 'flex-none', 'flex-col')
+    expect(linesSection).not.toHaveClass('flex-1')
+    expect(linesSection).not.toHaveClass('lg:flex-1')
+    expect(linesSection.parentElement).toBe(summary)
+    expect(saleDetails.parentElement).toBe(summary)
+    expect(Array.from(summary.children).indexOf(linesSection)).toBeLessThan(Array.from(summary.children).indexOf(saleDetails))
+    expect(within(selectedLines).getAllByRole('listitem')).toHaveLength(3)
+    const stickyHeader = screen.getByTestId('pos-summary-sticky-header')
+    expect(stickyHeader.parentElement).toBe(summary)
+    expect(stickyHeader).toHaveClass('sticky', 'top-0', 'z-20', 'shrink-0', 'bg-slate-900')
+    expect(within(stickyHeader).getByLabelText('3 artículos')).toBeInTheDocument()
+    expect(within(stickyHeader).getByRole('button', { name: 'Realizar venta' })).toBeInTheDocument()
+    expect(within(stickyHeader).getByRole('button', { name: 'Vaciar selección de venta' })).toBeInTheDocument()
+    expect(selectedLines).toHaveClass('ops-scroll-region', 'flex-none', 'max-h-none', 'overflow-visible', 'lg:flex-none')
+    expect(selectedLines).not.toHaveClass('overflow-y-auto', 'overscroll-contain')
+    expect(summary).toHaveClass('overflow-y-auto', 'overscroll-contain', 'lg:overflow-y-auto', 'lg:overscroll-contain')
+
+    fireEvent.click(screen.getByRole('button', { name: 'Volver al catálogo' }))
+    fireEvent.click(screen.getByRole('button', { name: `Agregar ${fourPosProducts[3].name} a la venta` }))
+    fireEvent.click(screen.getByRole('button', { name: 'Revisar venta' }))
+
+    selectedLines = screen.getByTestId('pos-selected-lines')
+    expect(screen.getByTestId('pos-lines-section')).toHaveClass('flex-none')
+    expect(screen.getByTestId('pos-lines-section')).not.toHaveClass('flex-1')
+    expect(screen.getByTestId('pos-lines-section')).not.toHaveClass('lg:flex-1')
+    expect(within(selectedLines).getAllByRole('listitem')).toHaveLength(4)
+    expect(selectedLines).toHaveClass('ops-scroll-region', 'flex-none', 'max-h-[min(28rem,42dvh)]', 'overflow-y-auto', 'overscroll-contain', 'lg:flex-none')
+    expect(summary).toHaveClass('overflow-y-auto', 'overscroll-contain', 'lg:overflow-y-auto', 'lg:overscroll-contain')
   })
 
    it('does not add the mobile POS checkout controls to non-POS channels', async () => {
