@@ -20,6 +20,24 @@
     --ops-control-transition: 160ms ease;
   }
 
+  @media (min-width: 36rem) {
+    html {
+      /* Compact rem-based layout on tablet-sized viewports, returning to baseline on wide screens. */
+      font-size: clamp(90%, calc(0.72rem + 0.28vw), 100%);
+    }
+
+    :root {
+      /* Keep the smallest shared text size readable as the root density adjusts. */
+      --text-xs: max(0.75rem, 12px);
+    }
+  }
+
+  @media (min-width: 36rem) and (pointer: coarse) {
+    :root {
+      --ops-control-height: max(2.75rem, 44px);
+    }
+  }
+
   [data-theme='light'] {
     color-scheme: light;
     --ops-canvas: #f8fafc;
@@ -830,6 +848,7 @@
 
     .ops-navbar-action.ops-action {
       min-height: var(--ops-control-height) !important;
+      min-width: 44px !important;
       gap: 0.5rem !important;
       padding: 0.625rem 0.875rem !important;
     }
@@ -1377,5 +1396,29 @@
   [data-print-ticket] * {
     border-color: #cbd5e1 !important;
     color: #000000 !important;
+  }
+}
+
+/* Keep touch targets intact when the responsive spacing scale is compact. */
+@media (pointer: coarse) {
+  button:not(:disabled),
+  [role="button"]:not([aria-disabled="true"]),
+  a[href].inline-flex,
+  a[href].flex,
+  [role="link"].inline-flex,
+  [role="link"].flex,
+  input:not([type="checkbox"]):not([type="radio"]):not(:disabled),
+  select:not(:disabled),
+  textarea:not(:disabled) {
+    min-height: 44px;
+  }
+
+  button:not(:disabled),
+  [role="button"]:not([aria-disabled="true"]),
+  a[href].inline-flex,
+  a[href].flex,
+  [role="link"].inline-flex,
+  [role="link"].flex {
+    min-width: 44px;
   }
 }
