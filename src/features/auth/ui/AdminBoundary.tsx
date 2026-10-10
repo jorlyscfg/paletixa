@@ -24,6 +24,7 @@ export const AUTH_REFRESH_INTERVAL_MS = 10 * 60 * 1000
 export function AdminBoundary({ children, admin, cashier, showLogin = true, onSessionClosed }: { children: ReactNode; admin?: (closeSession: SignOutHandler, context: AccessContext) => ReactNode; cashier?: (context: AccessContext, closeSession: SignOutHandler) => ReactNode; showLogin?: boolean; onSessionClosed?: () => void }) {
   const [access, setAccess] = useState<Access>({ state: 'loading' })
   const [signingIn, setSigningIn] = useState(false)
+  const [passwordVisible, setPasswordVisible] = useState(false)
   const [loginError, setLoginError] = useState<string | null>(null)
   const [fieldErrors, setFieldErrors] = useState<LoginFieldErrors>({})
   const [loginErrorSequence, setLoginErrorSequence] = useState(0)
@@ -162,7 +163,16 @@ export function AdminBoundary({ children, admin, cashier, showLogin = true, onSe
     <form aria-label="Inicio de sesión" className="mt-8 grid gap-4" onSubmit={submit}>
       {loginError && <div ref={alert} id="login-error" tabIndex={-1} role="alert" className="rounded-2xl border border-rose-500/30 bg-rose-950/30 px-4 py-3 text-sm leading-relaxed text-rose-100">{loginError}</div>}
       <label htmlFor="identifier" className="grid gap-1.5 text-sm font-medium text-slate-200">Correo electrónico o usuario<input id="identifier" name="identifier" type="text" autoComplete="username" aria-invalid={Boolean(fieldErrors.identifier)} aria-describedby={fieldErrors.identifier ? 'identifier-error' : loginError ? 'login-error' : undefined} onChange={clearLoginErrors} className={`ops-control ops-focus min-h-11 px-3 ${fieldErrors.identifier ? 'border-rose-400/70' : ''}`} />{fieldErrors.identifier && <span id="identifier-error" className="text-xs font-medium text-rose-200">{fieldErrors.identifier}</span>}</label>
-      <label htmlFor="password" className="grid gap-1.5 text-sm font-medium text-slate-200">Contraseña<input id="password" name="password" type="password" autoComplete="current-password" aria-invalid={Boolean(fieldErrors.password)} aria-describedby={fieldErrors.password ? 'password-error' : loginError ? 'login-error' : undefined} onChange={clearLoginErrors} className={`ops-control ops-focus min-h-11 px-3 ${fieldErrors.password ? 'border-rose-400/70' : ''}`} />{fieldErrors.password && <span id="password-error" className="text-xs font-medium text-rose-200">{fieldErrors.password}</span>}</label>
+      <div className="grid gap-1.5 text-sm font-medium text-slate-200">
+        <label htmlFor="password">Contraseña</label>
+        <div className="relative">
+          <input id="password" name="password" type={passwordVisible ? 'text' : 'password'} autoComplete="current-password" aria-invalid={Boolean(fieldErrors.password)} aria-describedby={fieldErrors.password ? 'password-error' : loginError ? 'login-error' : undefined} onChange={clearLoginErrors} className={`ops-control ops-focus min-h-11 w-full pl-3 pr-12 ${fieldErrors.password ? 'border-rose-400/70' : ''}`} />
+          <button type="button" aria-label={passwordVisible ? 'Ocultar contraseña' : 'Mostrar contraseña'} title={passwordVisible ? 'Ocultar contraseña' : 'Mostrar contraseña'} aria-pressed={passwordVisible} onClick={() => setPasswordVisible((visible) => !visible)} className="ops-focus absolute inset-y-0 right-0 inline-flex h-11 w-11 items-center justify-center rounded-r-lg text-slate-400 transition-colors hover:text-white">
+            <Icon name={passwordVisible ? 'eye-off' : 'eye'} className="h-5 w-5" />
+          </button>
+        </div>
+        {fieldErrors.password && <span id="password-error" className="text-xs font-medium text-rose-200">{fieldErrors.password}</span>}
+      </div>
       <ResponsiveActionButton type="submit" label={signingIn ? 'Iniciando sesión…' : 'Iniciar sesión'} icon="login" loading={signingIn} loadingLabel="Iniciando sesión…" />
     </form>
   </section></main>

@@ -35,6 +35,30 @@ describe('admin boundary', () => {
     expect(signInButton).toHaveClass('ops-action', 'ops-icon-button', 'h-11', 'w-11')
   })
 
+  it('reveals and conceals the password without submitting the login form', async () => {
+    render(<AdminBoundary><p>Contenido protegido</p></AdminBoundary>)
+
+    await screen.findByRole('form', { name: 'Inicio de sesión' })
+    const password = screen.getByLabelText('Contraseña')
+    expect(password).toHaveAttribute('type', 'password')
+    expect(password).toHaveAttribute('name', 'password')
+    expect(password).toHaveAttribute('autocomplete', 'current-password')
+
+    const revealButton = screen.getByRole('button', { name: 'Mostrar contraseña' })
+    expect(revealButton).toHaveAttribute('type', 'button')
+    expect(revealButton).toHaveAttribute('aria-pressed', 'false')
+    fireEvent.click(revealButton)
+
+    expect(password).toHaveAttribute('type', 'text')
+    expect(screen.getByRole('button', { name: 'Ocultar contraseña' })).toHaveAttribute('aria-pressed', 'true')
+    fireEvent.click(screen.getByRole('button', { name: 'Ocultar contraseña' }))
+
+    expect(password).toHaveAttribute('type', 'password')
+    expect(screen.getByRole('button', { name: 'Mostrar contraseña' })).toHaveAttribute('aria-pressed', 'false')
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+    expect(authApi.signIn).not.toHaveBeenCalled()
+  })
+
   it('deduplicates StrictMode startup access checks', async () => {
     render(<StrictMode><AdminBoundary><p>Contenido protegido</p></AdminBoundary></StrictMode>)
 
