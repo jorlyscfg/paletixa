@@ -227,6 +227,7 @@ export default defineConfig(({ command, mode, isPreview }) => {
       VitePWA({
         registerType: 'prompt',
         injectRegister: 'auto',
+        scope: '/app/',
         includeManifestIcons: false,
         manifest: {
           id: '/',
@@ -234,8 +235,8 @@ export default defineConfig(({ command, mode, isPreview }) => {
           short_name: 'Paletixa',
           description: "Catálogo y operaciones de La Paleti'Xa.",
           lang: 'es',
-          start_url: '/',
-          scope: '/',
+          start_url: '/app/',
+          scope: '/app/',
           display: 'standalone',
           display_override: ['standalone', 'minimal-ui', 'browser'],
           theme_color: '#fff8e7',
@@ -245,16 +246,11 @@ export default defineConfig(({ command, mode, isPreview }) => {
             { src: '/paletixa-icon-v1-512.svg', sizes: '512x512', type: 'image/svg+xml', purpose: 'any' },
             { src: '/paletixa-icon-v1-512-maskable.svg', sizes: '512x512', type: 'image/svg+xml', purpose: 'maskable' },
           ],
-          shortcuts: [
-            { name: 'Catálogo', short_name: 'Catálogo', url: '/', icons: [{ src: '/paletixa-icon-v1-192.svg', sizes: '192x192', type: 'image/svg+xml' }] },
-            { name: 'Mayoristas', short_name: 'Mayoristas', url: '/mayoristas', icons: [{ src: '/paletixa-icon-v1-192.svg', sizes: '192x192', type: 'image/svg+xml' }] },
-            { name: 'Reservas', short_name: 'Reservas', url: '/reservas', icons: [{ src: '/paletixa-icon-v1-192.svg', sizes: '192x192', type: 'image/svg+xml' }] },
-          ],
         },
         workbox: {
           cleanupOutdatedCaches: true,
           globPatterns: ['**/*.{js,css,html,ico,svg,png,jpg,jpeg,webp,avif}'],
-          navigateFallback: '/',
+          navigateFallback: '/index.html',
           navigateFallbackDenylist: [
             /^\/(?:api|rpc|products|product_categories|product_tags|branches|buckets|functions|realtime|socket\.io)(?:\/|$)/,
           ],

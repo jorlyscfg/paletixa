@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { ADMIN_LOGIN_PATH, EVENT_RESERVATION_PORTAL_PATH, isAdminLoginPath, isEventReservationPortalPath, isPublicLandingPath, isWholesaleCustomerPortalPath, PUBLIC_LANDING_PATH, WHOLESALE_CUSTOMER_PORTAL_PATH } from './publicRoutes'
+import { ADMIN_LOGIN_PATH, EVENT_RESERVATION_PORTAL_PATH, isAdminAppPath, isAdminLoginPath, isEventReservationPortalPath, isPublicLandingPath, isWholesaleCustomerPortalPath, PUBLIC_LANDING_PATH, WHOLESALE_CUSTOMER_PORTAL_PATH } from './publicRoutes'
 
 describe('public application routes', () => {
   it('recognizes the landing page only at the root path', () => {
@@ -12,6 +12,15 @@ describe('public application routes', () => {
     expect(isAdminLoginPath(ADMIN_LOGIN_PATH)).toBe(true)
     expect(isAdminLoginPath(`${ADMIN_LOGIN_PATH}/`)).toBe(true)
     expect(isAdminLoginPath(`${ADMIN_LOGIN_PATH}/reset`)).toBe(false)
+  })
+
+  it('keeps the installable app inside the /app/ path boundary', () => {
+    expect(isAdminAppPath('/app')).toBe(true)
+    expect(isAdminAppPath('/app/')).toBe(true)
+    expect(isAdminAppPath('/app/reports')).toBe(true)
+    expect(isAdminAppPath('/')).toBe(false)
+    expect(isAdminAppPath('/mayoristas')).toBe(false)
+    expect(isAdminAppPath('/application')).toBe(false)
   })
 
   it('recognizes the customer portal without introducing a router', () => {

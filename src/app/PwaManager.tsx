@@ -1,44 +1,70 @@
 import { useEffect, useState } from 'react'
 import { useRegisterSW } from 'virtual:pwa-register/react'
 import { isIosOrIpadOS, isStandaloneDisplayMode } from './pwaEnvironment'
+import { isAdminAppPath } from './publicRoutes'
 
 interface BeforeInstallPromptEvent extends Event {
   prompt: () => Promise<void>
   userChoice: Promise<{ outcome: 'accepted' | 'dismissed'; platform: string }>
 }
 
+async function unregisterLegacyRootServiceWorker() {
+  if (!('serviceWorker' in navigator)) return
+
+  try {
+    const rootScope = new URL('/', window.location.origin).href
+    const registrations = await navigator.serviceWorker.getRegistrations()
+    const legacyRegistrations = registrations.filter((registration) => registration.scope === rootScope
+      && [registration.active, registration.waiting, registration.installing].some((worker) => worker !== null && new URL(worker.scriptURL).pathname === '/sw.js'))
+    await Promise.all(legacyRegistrations.map((registration) => registration.unregister()))
+  } catch {
+    // Removing the previous origin-wide registration is best effort; it must not block the app.
+  }
+}
+
 export function PwaManager() {
-  const {
-    offlineReady: [offlineReady, setOfflineReady],
-    needRefresh: [needRefresh, setNeedRefresh],
-    updateServiceWorker,
-  } = useRegisterSW({ immediate: true })
+  const [pathname, setPathname] = useState(() => window.location.pathname)
   const [installPrompt, setInstallPrompt] = useState<BeforeInstallPromptEvent | null>(null)
   const [installed, setInstalled] = useState(false)
-  const [standalone, setStandalone] = useState(isStandaloneDisplayMode)
-  const [iosFallbackDismissed, setIosFallbackDismissed] = useState(false)
-  const [installBusy, setInstallBusy] = useState(false)
-  const [updateBusy, setUpdateBusy] = useState(false)
 
   useEffect(() => {
+    const syncPathname = () => setPathname(window.location.pathname)
     const handleBeforeInstallPrompt = (event: Event) => {
       const promptEvent = event as BeforeInstallPromptEvent
-      if (typeof promptEvent.prompt !== 'function') return
       event.preventDefault()
-      setInstallPrompt(promptEvent)
+      if (typeof promptEvent.prompt === 'function') setInstallPrompt(promptEvent)
     }
     const handleAppInstalled = () => {
       setInstallPrompt(null)
       setInstalled(true)
     }
 
+    window.addEventListener('popstate', syncPathname)
     window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt)
     window.addEventListener('appinstalled', handleAppInstalled)
+    void unregisterLegacyRootServiceWorker()
     return () => {
+      window.removeEventListener('popstate', syncPathname)
       window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt)
       window.removeEventListener('appinstalled', handleAppInstalled)
     }
   }, [])
+
+  return isAdminAppPath(pathname)
+    ? <PwaManagerExperience installPrompt={installPrompt} installed={installed} onInstallPromptDismiss={() => setInstallPrompt(null)} />
+    : null
+}
+
+function PwaManagerExperience({ installPrompt, installed, onInstallPromptDismiss }: { installPrompt: BeforeInstallPromptEvent | null; installed: boolean; onInstallPromptDismiss: () => void }) {
+  const {
+    offlineReady: [offlineReady, setOfflineReady],
+    needRefresh: [needRefresh, setNeedRefresh],
+    updateServiceWorker,
+  } = useRegisterSW({ immediate: true })
+  const [standalone, setStandalone] = useState(isStandaloneDisplayMode)
+  const [iosFallbackDismissed, setIosFallbackDismissed] = useState(false)
+  const [installBusy, setInstallBusy] = useState(false)
+  const [updateBusy, setUpdateBusy] = useState(false)
 
   useEffect(() => {
     const displayMode = window.matchMedia?.('(display-mode: standalone)')
@@ -54,9 +80,9 @@ export function PwaManager() {
     try {
       await installPrompt.prompt()
       const choice = await installPrompt.userChoice
-      if (choice.outcome === 'accepted' || choice.outcome === 'dismissed') setInstallPrompt(null)
+      if (choice.outcome === 'accepted' || choice.outcome === 'dismissed') onInstallPromptDismiss()
     } catch {
-      setInstallPrompt(null)
+      onInstallPromptDismiss()
     } finally {
       setInstallBusy(false)
     }
@@ -113,11 +139,11 @@ export function PwaManager() {
             <p id="pwa-install-title" className="pwa-manager__title">Lleva Paletixa contigo.</p>
             <p className="pwa-manager__copy">Instálala para abrirla como una aplicación desde tu dispositivo.</p>
           </div>
-          <button type="button" className="pwa-manager__close" aria-label="Ocultar opción para instalar Paletixa" onClick={() => setInstallPrompt(null)}>×</button>
+          <button type="button" className="pwa-manager__close" aria-label="Ocultar opción para instalar Paletixa" onClick={onInstallPromptDismiss}>×</button>
         </div>
         <div className="pwa-manager__actions">
           <button type="button" className="pwa-manager__button pwa-manager__button--primary" onClick={() => void handleInstall()} disabled={installBusy} aria-busy={installBusy}>{installBusy ? 'Abriendo instalación…' : 'Instalar Paletixa'}</button>
-          <button type="button" className="pwa-manager__button pwa-manager__button--secondary" onClick={() => setInstallPrompt(null)}>Ahora no</button>
+          <button type="button" className="pwa-manager__button pwa-manager__button--secondary" onClick={onInstallPromptDismiss}>Ahora no</button>
         </div>
       </section>}
 

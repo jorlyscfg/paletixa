@@ -11,6 +11,10 @@ export function isAdminLoginPath(pathname = window.location.pathname) {
   return pathname === ADMIN_LOGIN_PATH || pathname === `${ADMIN_LOGIN_PATH}/`
 }
 
+export function isAdminAppPath(pathname = window.location.pathname) {
+  return pathname === ADMIN_LOGIN_PATH || pathname.startsWith(`${ADMIN_LOGIN_PATH}/`)
+}
+
 export function isWholesaleCustomerPortalPath(pathname = window.location.pathname) {
   return pathname === WHOLESALE_CUSTOMER_PORTAL_PATH || pathname.startsWith(`${WHOLESALE_CUSTOMER_PORTAL_PATH}/`)
 }

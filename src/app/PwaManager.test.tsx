@@ -9,14 +9,22 @@ const swMock = vi.hoisted(() => ({
   setOfflineReady: vi.fn(),
   setNeedRefresh: vi.fn(),
   updateServiceWorker: vi.fn(async () => undefined),
+  useRegisterSW: vi.fn(),
+}))
+
+const serviceWorkerMock = vi.hoisted(() => ({
+  getRegistrations: vi.fn(async () => [] as unknown[]),
 }))
 
 vi.mock('virtual:pwa-register/react', () => ({
-  useRegisterSW: () => ({
-    offlineReady: [swMock.offlineReady, swMock.setOfflineReady],
-    needRefresh: [swMock.needRefresh, swMock.setNeedRefresh],
-    updateServiceWorker: swMock.updateServiceWorker,
-  }),
+  useRegisterSW: (...args: unknown[]) => {
+    swMock.useRegisterSW(...args)
+    return {
+      offlineReady: [swMock.offlineReady, swMock.setOfflineReady],
+      needRefresh: [swMock.needRefresh, swMock.setNeedRefresh],
+      updateServiceWorker: swMock.updateServiceWorker,
+    }
+  },
 }))
 
 function createBeforeInstallPromptEvent() {
@@ -36,7 +44,12 @@ describe('PwaManager', () => {
     swMock.setOfflineReady.mockReset()
     swMock.setNeedRefresh.mockReset()
     swMock.updateServiceWorker.mockClear()
+    swMock.useRegisterSW.mockClear()
+    serviceWorkerMock.getRegistrations.mockReset()
+    serviceWorkerMock.getRegistrations.mockResolvedValue([])
     vi.restoreAllMocks()
+    window.history.replaceState({}, '', '/app/')
+    Object.defineProperty(navigator, 'serviceWorker', { configurable: true, value: serviceWorkerMock })
     Object.defineProperty(navigator, 'userAgent', { configurable: true, value: 'Mozilla/5.0' })
     Object.defineProperty(navigator, 'platform', { configurable: true, value: 'Linux' })
     Object.defineProperty(navigator, 'maxTouchPoints', { configurable: true, value: 0 })
@@ -46,6 +59,41 @@ describe('PwaManager', () => {
   afterEach(() => {
     cleanup()
     vi.restoreAllMocks()
+    window.history.replaceState({}, '', '/')
+  })
+
+  it('registers and prompts only under the admin app path', async () => {
+    window.history.replaceState({}, '', '/')
+    render(<PwaManager />)
+
+    expect(swMock.useRegisterSW).not.toHaveBeenCalled()
+    const publicEvent = createBeforeInstallPromptEvent()
+    window.dispatchEvent(publicEvent)
+    expect(publicEvent.defaultPrevented).toBe(true)
+    expect(screen.queryByRole('button', { name: 'Instalar Paletixa' })).not.toBeInTheDocument()
+
+    window.history.pushState({}, '', '/app/')
+    window.dispatchEvent(new PopStateEvent('popstate'))
+    await waitFor(() => expect(swMock.useRegisterSW).toHaveBeenCalledWith({ immediate: true }))
+
+    expect(publicEvent.prompt).not.toHaveBeenCalled()
+    expect(await screen.findByRole('button', { name: 'Instalar Paletixa' })).toBeInTheDocument()
+  })
+
+  it('unregisters the previous origin-wide Paletixa worker', async () => {
+    window.history.replaceState({}, '', '/')
+    const unregister = vi.fn(async () => true)
+    serviceWorkerMock.getRegistrations.mockResolvedValue([{
+      scope: `${window.location.origin}/`,
+      active: { scriptURL: `${window.location.origin}/sw.js` },
+      waiting: null,
+      installing: null,
+      unregister,
+    }])
+    render(<PwaManager />)
+
+    await waitFor(() => expect(unregister).toHaveBeenCalledOnce())
+    expect(swMock.useRegisterSW).not.toHaveBeenCalled()
   })
 
   it('shows offline readiness in Spanish and only dismisses it on user action', () => {
